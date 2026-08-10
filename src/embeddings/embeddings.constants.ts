@@ -1,0 +1,1 @@
+export const EMBEDDINGS_PROVIDER = Symbol('EMBEDDINGS_PROVIDER');

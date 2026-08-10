@@ -1,0 +1,28 @@
+name: AI PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run AI review
+        # Pinned to a commit SHA (not @master) so a future push to that
+        # branch can't silently change what runs in this CI job with
+        # access to ANTHROPIC_API_KEY / GITHUB_TOKEN. Bump deliberately:
+        # https://github.com/NivL1/ai-pr-reviewer/releases/tag/v0.1.1
+        uses: NivL1/ai-pr-reviewer@e8ea28ffd8424b22f8b72a467528e2bbc7339128
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
