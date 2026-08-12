@@ -1,3 +1,4 @@
+import { join } from 'path';
 import { BadRequestException } from '@nestjs/common';
 import { WorkspaceService } from './workspace.service';
 
@@ -32,6 +33,11 @@ describe('WorkspaceService', () => {
   it('analyses a readable local path in place rather than cloning it', async () => {
     const result = await service.checkout('some-id', process.cwd());
     expect(result).toBe(process.cwd());
+  });
+
+  it('rejects a local path that is a file, not a directory', async () => {
+    const aFile = join(process.cwd(), 'package.json');
+    await expect(service.checkout('some-id', aFile)).rejects.toThrow(/not a directory/);
   });
 
   it('returns null for headCommit when the path is not a git repository', async () => {

@@ -73,6 +73,24 @@ describe('RepositoriesService', () => {
     });
   });
 
+  it('translates a unique-violation from a concurrent insert into a ConflictException', async () => {
+    repositories.save.mockRejectedValue(
+      Object.assign(new Error('duplicate key'), { code: '23505' }),
+    );
+
+    await expect(service.create('https://github.com/NivL1/x.git')).rejects.toThrow(
+      ConflictException,
+    );
+  });
+
+  it('rethrows a save error that is not a unique violation', async () => {
+    repositories.save.mockRejectedValue(new Error('connection lost'));
+
+    await expect(service.create('https://github.com/NivL1/x.git')).rejects.toThrow(
+      'connection lost',
+    );
+  });
+
   it('marks the repository failed with the reason when checkout throws', async () => {
     workspace.checkout.mockRejectedValue(new Error('repository not found'));
 
@@ -96,5 +114,28 @@ describe('RepositoriesService', () => {
 
     expect(repositories.delete).toHaveBeenCalledWith('repo-id');
     expect(workspace.remove).toHaveBeenCalledWith('repo-id');
+  });
+
+  it('removes the workspace before the row, so a failure leaves the row for a retry', async () => {
+    const order: string[] = [];
+    workspace.remove.mockImplementation(() => {
+      order.push('workspace');
+      return Promise.resolve();
+    });
+    repositories.delete.mockImplementation(() => {
+      order.push('row');
+      return Promise.resolve();
+    });
+
+    await service.remove('repo-id');
+
+    expect(order).toEqual(['workspace', 'row']);
+  });
+
+  it('leaves the row intact if removing the workspace fails', async () => {
+    workspace.remove.mockRejectedValue(new Error('permission denied'));
+
+    await expect(service.remove('repo-id')).rejects.toThrow('permission denied');
+    expect(repositories.delete).not.toHaveBeenCalled();
   });
 });

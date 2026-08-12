@@ -21,13 +21,24 @@ export class RepositoriesService {
   async create(source: string, name?: string): Promise<Repository> {
     const resolvedName = name ?? deriveName(source);
 
+    // Fast path only — two concurrent requests for the same name can both
+    // pass this check before either inserts. The actual guarantee is the
+    // UQ_repositories_name constraint, enforced below.
     if (await this.repositories.existsBy({ name: resolvedName })) {
       throw new ConflictException(`a repository named "${resolvedName}" already exists`);
     }
 
-    const repository = await this.repositories.save(
-      this.repositories.create({ name: resolvedName, source, status: 'cloning' }),
-    );
+    let repository: Repository;
+    try {
+      repository = await this.repositories.save(
+        this.repositories.create({ name: resolvedName, source, status: 'cloning' }),
+      );
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException(`a repository named "${resolvedName}" already exists`);
+      }
+      throw error;
+    }
 
     try {
       const checkoutPath = await this.workspace.checkout(repository.id, source);
@@ -57,10 +68,14 @@ export class RepositoriesService {
   }
 
   async remove(id: string): Promise<void> {
-    const repository = await this.findOne(id);
+    await this.findOne(id); // throws NotFoundException for an unknown id
+
+    // Workspace first: if this throws, the row survives and the caller can
+    // retry. Deleting the row first would risk the opposite failure mode —
+    // a directory on disk with no row left pointing at it to retry from.
+    await this.workspace.remove(id);
     // Symbols, edges and chunks go with it via ON DELETE CASCADE.
-    await this.repositories.delete(repository.id);
-    await this.workspace.remove(repository.id);
+    await this.repositories.delete(id);
   }
 
   async update(id: string, changes: Partial<Repository>): Promise<Repository> {
@@ -82,4 +97,11 @@ function deriveName(source: string): string {
   const segments = trimmed.split('/').filter(Boolean);
   const wanted = isAbsolute(source) ? 1 : 2;
   return segments.slice(-wanted).join('/') || trimmed;
+}
+
+/** Postgres error code 23505 = unique_violation. */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' && error !== null && (error as { code?: string }).code === '23505'
+  );
 }

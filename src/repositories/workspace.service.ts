@@ -1,5 +1,5 @@
 import { execFile } from 'child_process';
-import { access, mkdir, rm } from 'fs/promises';
+import { mkdir, rm, stat } from 'fs/promises';
 import { isAbsolute, join, resolve } from 'path';
 import { promisify } from 'util';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
@@ -95,10 +95,16 @@ export class WorkspaceService {
   }
 
   private async assertReadable(path: string): Promise<void> {
+    let stats: Awaited<ReturnType<typeof stat>>;
     try {
-      await access(path);
+      stats = await stat(path);
     } catch {
       throw new BadRequestException(`local path is not readable: ${path}`);
+    }
+    // A file (not a directory) passes a plain access() check but fails
+    // ts-morph in a much more confusing way later — catch it here instead.
+    if (!stats.isDirectory()) {
+      throw new BadRequestException(`local path is not a directory: ${path}`);
     }
   }
 }

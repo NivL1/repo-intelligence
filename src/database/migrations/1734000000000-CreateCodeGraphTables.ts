@@ -7,6 +7,15 @@ export class CreateCodeGraphTables1734000000000 implements MigrationInterface {
     // Read at execution time rather than module-load time, so this doesn't
     // depend on data-source.ts's dotenv config() call having already run.
     const dimensions = parseInt(process.env.EMBEDDING_DIMENSIONS ?? '384', 10);
+    // This value is interpolated directly into the CREATE TABLE below (no
+    // placeholder support for a column type modifier), so a malformed env
+    // var must fail the migration with a clear message here rather than
+    // reach Postgres as `vector(NaN)` and fail with a cryptic syntax error.
+    if (!Number.isInteger(dimensions) || dimensions <= 0) {
+      throw new Error(
+        `EMBEDDING_DIMENSIONS must be a positive integer, got "${process.env.EMBEDDING_DIMENSIONS}"`,
+      );
+    }
 
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "vector"`);
 
