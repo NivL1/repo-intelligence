@@ -1,8 +1,10 @@
+import { randomUUID } from 'crypto';
 import { access } from 'fs/promises';
 import { join } from 'path';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository as TypeOrmRepository } from 'typeorm';
+import { Repository } from '../repositories/entities/repository.entity';
 import { RepositoriesService } from '../repositories/repositories.service';
 import { WorkspaceService } from '../repositories/workspace.service';
 import { Edge } from './entities/edge.entity';
@@ -10,6 +12,7 @@ import { CodeSymbol } from './entities/symbol.entity';
 import { SymbolExtractor } from './symbol-extractor';
 
 export interface IndexRunResult {
+  repository: Repository;
   symbolsExtracted: number;
   edgesDiscovered: number;
 }
@@ -47,27 +50,29 @@ export class IndexingService {
 
       await this.symbols.delete({ repositoryId });
 
-      const savedSymbols = symbols.length
-        ? await this.symbols.save(
-            symbols.map((s) =>
-              this.symbols.create({
-                repositoryId,
-                name: s.name,
-                qualifiedName: s.qualifiedName,
-                kind: s.kind,
-                filePath: s.filePath,
-                startLine: s.startLine,
-                endLine: s.endLine,
-              }),
-            ),
-          )
-        : [];
+      // Ids are assigned here, client-side, rather than left to Postgres's
+      // column default — so keyToId below is built from what WE generated,
+      // not from correlating positions in save()'s return array back to
+      // the input array. TypeORM/Postgres don't guarantee a bulk INSERT's
+      // RETURNING order matches VALUES order, so that correlation would be
+      // an assumption, not a guarantee.
+      const symbolRows = symbols.map((s) =>
+        this.symbols.create({
+          id: randomUUID(),
+          repositoryId,
+          name: s.name,
+          qualifiedName: s.qualifiedName,
+          kind: s.kind,
+          filePath: s.filePath,
+          startLine: s.startLine,
+          endLine: s.endLine,
+        }),
+      );
+      if (symbolRows.length) {
+        await this.symbols.save(symbolRows);
+      }
 
-      // save() on a freshly-created array preserves order, so this index
-      // correspondence is safe — but the fallback to `undefined` on a miss
-      // still makes the edge-resolution filter below meaningful rather
-      // than a silent assumption.
-      const keyToId = new Map(symbols.map((s, i) => [s.key, savedSymbols[i]?.id]));
+      const keyToId = new Map(symbols.map((s, i) => [s.key, symbolRows[i].id]));
 
       const edgeRows = edges
         .map((e) => {
@@ -82,7 +87,7 @@ export class IndexingService {
         await this.edges.save(edgeRows);
       }
 
-      await this.repositoriesService.update(repositoryId, {
+      const updatedRepository = await this.repositoriesService.update(repositoryId, {
         status: 'ready',
         indexedCommit: commit,
         indexedAt: new Date(),
@@ -90,10 +95,14 @@ export class IndexingService {
       });
 
       this.logger.log(
-        `Indexed ${repository.name}: ${savedSymbols.length} symbols, ${edgeRows.length} edges`,
+        `Indexed ${repository.name}: ${symbolRows.length} symbols, ${edgeRows.length} edges`,
       );
 
-      return { symbolsExtracted: savedSymbols.length, edgesDiscovered: edgeRows.length };
+      return {
+        repository: updatedRepository,
+        symbolsExtracted: symbolRows.length,
+        edgesDiscovered: edgeRows.length,
+      };
     } catch (error) {
       await this.repositoriesService.update(repositoryId, {
         status: 'failed',

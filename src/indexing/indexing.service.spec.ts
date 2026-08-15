@@ -17,10 +17,13 @@ describe('IndexingService', () => {
   beforeEach(() => {
     symbols = {
       delete: jest.fn().mockResolvedValue(undefined),
+      // The service assigns ids itself before calling save() and never
+      // reads save()'s return value for symbols, so this mock's return is
+      // irrelevant — deliberately, that's the fix for the finding that
+      // correlating save()'s returned order back to the input array isn't
+      // a guarantee TypeORM/Postgres actually make.
       create: jest.fn((row) => row),
-      save: jest.fn((rows: Array<{ [key: string]: unknown }>) =>
-        Promise.resolve(rows.map((row, i) => ({ ...row, id: `sym-${i}` }))),
-      ),
+      save: jest.fn().mockResolvedValue(undefined),
     };
     edges = {
       create: jest.fn((row) => row),
@@ -30,7 +33,7 @@ describe('IndexingService', () => {
       findOne: jest
         .fn()
         .mockResolvedValue({ id: 'repo-id', name: 'owner/repo', source: FIXTURE_ROOT }),
-      update: jest.fn().mockResolvedValue(undefined),
+      update: jest.fn().mockResolvedValue({ id: 'repo-id', status: 'ready' }),
     };
     workspace = {
       checkout: jest.fn().mockResolvedValue(FIXTURE_ROOT),
@@ -95,13 +98,20 @@ describe('IndexingService', () => {
 
     const result = await service.index('repo-id');
 
+    // Ids are generated client-side (randomUUID), not read back from a
+    // mocked save() — so assert the edge points at whatever id the "Foo"
+    // and "bar" symbols actually got (create() is called in extraction
+    // order: Foo first, bar second), rather than a hardcoded value.
+    const [fooId, barId] = symbols.create.mock.results.map((r) => (r.value as { id: string }).id);
+
     expect(edges.create).toHaveBeenCalledWith({
       repositoryId: 'repo-id',
-      fromSymbolId: 'sym-1',
-      toSymbolId: 'sym-0',
+      fromSymbolId: barId,
+      toSymbolId: fooId,
       kind: 'calls',
     });
-    expect(result).toEqual({ symbolsExtracted: 2, edgesDiscovered: 1 });
+    expect(result.symbolsExtracted).toBe(2);
+    expect(result.edgesDiscovered).toBe(1);
   });
 
   it('drops an edge whose endpoint did not resolve to a saved symbol', async () => {
@@ -137,6 +147,19 @@ describe('IndexingService', () => {
       indexedAt: expect.any(Date),
       error: null,
     });
+  });
+
+  it('returns the repository as updated by that final "ready" call, not a stale earlier read', async () => {
+    extractor.extract.mockReturnValue({ symbols: [], edges: [] });
+    repositoriesService.update.mockImplementation((_id: string, changes: Record<string, unknown>) =>
+      Promise.resolve({ id: 'repo-id', ...changes }),
+    );
+
+    const result = await service.index('repo-id');
+
+    // Proves the controller no longer needs its own findOne() to get a
+    // consistent view — index() already returns the post-update repository.
+    expect(result.repository).toEqual(expect.objectContaining({ status: 'ready' }));
   });
 
   it('rejects a repository with no tsconfig.json and marks it failed, without extracting', async () => {

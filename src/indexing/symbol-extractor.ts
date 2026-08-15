@@ -36,6 +36,15 @@ export interface ExtractionResult {
 
 type CallableDeclaration = MethodDeclaration | FunctionDeclaration;
 
+// Matches .spec.ts, .test.ts, .spec.tsx, .test.tsx — both Jest test-file
+// conventions, not just the one this repo happens to use. Not delegated to
+// the target's own tsconfig `exclude`: that field conventionally excludes
+// directories (node_modules, dist), not same-folder spec files — this
+// project's own tsconfig.json is a working example of exactly that, with
+// no spec exclusion at all (only tsconfig.build.json's separate, build-only
+// exclude list has one).
+const TEST_FILE_PATTERN = /\.(spec|test)\.tsx?$/;
+
 /**
  * Parses a TypeScript project with the compiler (via ts-morph) into a flat
  * list of symbols and the edges between them. No database dependency —
@@ -69,7 +78,7 @@ export class SymbolExtractor {
       if (
         file.isDeclarationFile() ||
         filePath.includes('node_modules') ||
-        filePath.endsWith('.spec.ts')
+        TEST_FILE_PATTERN.test(filePath)
       ) {
         continue;
       }

@@ -1,7 +1,6 @@
 import { Controller, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RepositoryResponseDto } from '../repositories/dto/repository-response.dto';
-import { RepositoriesService } from '../repositories/repositories.service';
 import { IndexResultDto } from './dto/index-result.dto';
 import { IndexingService } from './indexing.service';
 
@@ -9,10 +8,7 @@ import { IndexingService } from './indexing.service';
 @ApiTags('repositories')
 @Controller('repositories')
 export class IndexingController {
-  constructor(
-    private readonly indexing: IndexingService,
-    private readonly repositories: RepositoriesService,
-  ) {}
+  constructor(private readonly indexing: IndexingService) {}
 
   @Post(':id/index')
   @HttpCode(HttpStatus.OK)
@@ -24,7 +20,10 @@ export class IndexingController {
   })
   async index(@Param('id', ParseUUIDPipe) id: string): Promise<IndexResultDto> {
     const result = await this.indexing.index(id);
-    const repository = await this.repositories.findOne(id);
-    return { repository: RepositoryResponseDto.from(repository), ...result };
+    return {
+      repository: RepositoryResponseDto.from(result.repository),
+      symbolsExtracted: result.symbolsExtracted,
+      edgesDiscovered: result.edgesDiscovered,
+    };
   }
 }
