@@ -22,13 +22,22 @@ WORKDIR /app
 ENV NODE_ENV=production
 # WorkspaceService shells out to `git clone` to fetch repositories for
 # analysis, and node:20-slim ships without git — without this, registering
-# any remote repository fails at runtime with "git: not found".
+# any remote repository fails at runtime with "git: not found". It also
+# ships without a CA bundle, which surfaces as a much more confusing
+# failure ("server certificate verification failed: CAfile: none") on the
+# first https:// clone rather than at build time — ca-certificates fixes
+# that.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends git \
+  && apt-get install -y --no-install-recommends git ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 COPY --chown=node:node package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY --from=builder --chown=node:node /app/dist ./dist
+# WORKSPACE_DIR (./.workspace, i.e. /app/.workspace) is created here with
+# node:node ownership: WORKDIR itself is created by root, so without this
+# the non-root `node` user below gets EACCES the first time it tries to
+# mkdir a workspace for a cloned repository.
+RUN mkdir -p /app/.workspace && chown node:node /app/.workspace
 USER node
 EXPOSE 3000
 CMD ["node", "dist/main.js"]

@@ -19,9 +19,9 @@ Two of the three never touch an LLM, so their answers are reproducible rather th
 Early — v0.1.0 is in progress. What actually works today:
 
 - [x] **Repository registration** — clone an https:// git URL or reference a local checkout, tracked through a `pending → indexing → ready` lifecycle
+- [x] **Symbol graph extraction** — `POST /repositories/:id/index` parses a TypeScript project with the compiler (via `ts-morph`) and records every class, method, function and interface, plus the `calls` / `implements` / `extends` / NestJS constructor-`injects` edges between them
 - [x] Schema for `repositories`, `symbols`, `edges`, `chunks`
 - [x] Inherited foundation: JWT auth, Postgres, Redis, pluggable embeddings (local ONNX by default), Docker, CI, Swagger
-- [ ] Symbol extraction via `ts-morph` (Day 2)
 - [ ] `impact` — blast radius analysis (Day 3)
 - [ ] AST-aware chunking and embedding (Day 4)
 - [ ] `ask` — hybrid retrieval with `file:line` citations (Day 5)
@@ -61,6 +61,31 @@ curl -X POST http://localhost:3000/repositories \
 ```
 
 Remote sources must be `https://` — see [WorkspaceService](src/repositories/workspace.service.ts) for why other git transports are rejected.
+
+Then index it:
+
+```bash
+curl -X POST http://localhost:3000/repositories/$REPO_ID/index \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Real output from running this against [nestjs-ai-starter](https://github.com/NivL1/nestjs-ai-starter) itself:
+
+```json
+{
+  "repository": { "name": "NivL1/nestjs-ai-starter", "status": "ready", "indexedCommit": "7822fa7…" },
+  "symbolsExtracted": 78,
+  "edgesDiscovered": 31
+}
+```
+
+And the compiler correctly resolved every one of that repo's NestJS dependency-injection edges, including one typed as an interface rather than a concrete class:
+
+```
+SearchService          --injects--> EmbeddingCacheService
+EmbeddingCacheService  --injects--> EmbeddingsProvider   (an interface, not a class)
+AuthService            --injects--> UsersService
+```
 
 ## Testing
 
