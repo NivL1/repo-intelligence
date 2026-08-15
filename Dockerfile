@@ -20,6 +20,12 @@ USER node
 FROM node:20-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+# WorkspaceService shells out to `git clone` to fetch repositories for
+# analysis, and node:20-slim ships without git — without this, registering
+# any remote repository fails at runtime with "git: not found".
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends git \
+  && rm -rf /var/lib/apt/lists/*
 COPY --chown=node:node package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY --from=builder --chown=node:node /app/dist ./dist
