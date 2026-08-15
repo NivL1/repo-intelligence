@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { EmbeddingsModule } from './embeddings/embeddings.module';
 import { RepositoriesModule } from './repositories/repositories.module';
+import { IndexingModule } from './indexing/indexing.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { RepositoriesModule } from './repositories/repositories.module';
     HealthModule,
     EmbeddingsModule,
     RepositoriesModule,
+    IndexingModule,
   ],
 })
 export class AppModule {}
