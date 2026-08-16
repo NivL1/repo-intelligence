@@ -35,9 +35,7 @@ export class WorkspaceService {
       return source;
     }
 
-    // The UUID is the directory name, so no part of the path is derived
-    // from user input and there is nothing to sanitise for traversal.
-    const target = join(this.workspaceRoot(), repositoryId);
+    const target = this.resolvePath(repositoryId, source);
     await mkdir(this.workspaceRoot(), { recursive: true });
     await rm(target, { recursive: true, force: true });
 
@@ -46,6 +44,20 @@ export class WorkspaceService {
     await run('git', ['clone', '--depth', '1', '--', source, target]);
 
     return target;
+  }
+
+  /**
+   * Same path checkout() would use, computed with no filesystem or git
+   * access. For read-only queries (e.g. checking whether a spec file
+   * exists) that shouldn't pay for a re-clone just to answer a question —
+   * they read whatever was left on disk by the last checkout(), which is
+   * a stale-but-safe assumption: worst case is a missing/wrong answer for
+   * a repo that moved since it was last indexed, not a wrong write.
+   */
+  resolvePath(repositoryId: string, source: string): string {
+    // The UUID is the directory name, so no part of the path is derived
+    // from user input and there is nothing to sanitise for traversal.
+    return isAbsolute(source) ? source : join(this.workspaceRoot(), repositoryId);
   }
 
   /** Short-circuits re-indexing when the working copy hasn't moved. */
