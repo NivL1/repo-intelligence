@@ -166,7 +166,9 @@ describe('ImpactService', () => {
       const result = await service.getImpact('repo-id', { symbolId: 'target', depth: 10 });
 
       expect(result.callers.map((c) => c.symbol.id)).toEqual(['a', 'b']);
-      expect(edges.find).toHaveBeenCalledTimes(3); // stopped once the frontier had nothing new
+      // 3rd call finds the a->b edge back, but `a` is already visited, so
+      // nextIds is empty and the loop breaks WITHOUT a 4th find() call.
+      expect(edges.find).toHaveBeenCalledTimes(3);
     });
 
     it('derives distinct, sorted affected modules from caller file paths', async () => {

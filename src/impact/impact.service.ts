@@ -91,7 +91,7 @@ export class ImpactService {
       );
       if (nextIds.length === 0) break;
 
-      const nextSymbols = await this.symbols.find({ where: { id: In(nextIds) } });
+      const nextSymbols = await this.symbols.find({ where: { id: In(nextIds), repositoryId } });
       for (const symbol of nextSymbols) {
         visited.add(symbol.id);
         callers.push({ symbol: toSummary(symbol), depth });
