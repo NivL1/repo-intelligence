@@ -79,6 +79,15 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   WORKSPACE_DIR: string = './.workspace';
+
+  // @xenova/transformers defaults its model cache to a directory INSIDE
+  // node_modules/@xenova/transformers itself — root-owned in the Docker
+  // image, so the non-root runtime user gets EACCES on first use and
+  // silently re-downloads the ~90MB model on every restart instead of
+  // caching it. Redirecting to an app-owned directory fixes that.
+  @IsString()
+  @IsOptional()
+  ONNX_CACHE_DIR: string = './.cache';
 }
 
 /**
@@ -114,6 +123,7 @@ export interface AppConfig {
   embeddings: {
     provider: string;
     onnxModel: string;
+    onnxCacheDir: string;
     openaiApiKey: string;
     openaiModel: string;
     ollamaBaseUrl: string;
@@ -144,6 +154,7 @@ export function configuration(): AppConfig {
     embeddings: {
       provider: process.env.EMBEDDINGS_PROVIDER ?? 'onnx',
       onnxModel: process.env.ONNX_EMBEDDING_MODEL ?? 'Xenova/all-MiniLM-L6-v2',
+      onnxCacheDir: process.env.ONNX_CACHE_DIR ?? './.cache',
       openaiApiKey: process.env.OPENAI_API_KEY ?? '',
       openaiModel: process.env.OPENAI_EMBEDDING_MODEL ?? 'text-embedding-3-small',
       ollamaBaseUrl: process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434',

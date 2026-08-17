@@ -9,9 +9,11 @@ describe('IndexingService', () => {
 
   let symbols: { delete: jest.Mock; create: jest.Mock; save: jest.Mock };
   let edges: { create: jest.Mock; save: jest.Mock };
+  let dataSource: { query: jest.Mock };
   let repositoriesService: { findOne: jest.Mock; update: jest.Mock };
   let workspace: { checkout: jest.Mock; headCommit: jest.Mock };
   let extractor: { extract: jest.Mock };
+  let embeddings: { embed: jest.Mock };
   let service: IndexingService;
 
   beforeEach(() => {
@@ -29,6 +31,7 @@ describe('IndexingService', () => {
       create: jest.fn((row) => row),
       save: jest.fn((rows: unknown[]) => Promise.resolve(rows)),
     };
+    dataSource = { query: jest.fn().mockResolvedValue(undefined) };
     repositoriesService = {
       findOne: jest
         .fn()
@@ -40,6 +43,7 @@ describe('IndexingService', () => {
       headCommit: jest.fn().mockResolvedValue('abc123'),
     };
     extractor = { extract: jest.fn() };
+    embeddings = { embed: jest.fn().mockResolvedValue([0.1, 0.2, 0.3]) };
 
     service = new IndexingService(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -47,16 +51,20 @@ describe('IndexingService', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       edges as any,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dataSource as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       repositoriesService as any,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       workspace as any,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       extractor as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      embeddings as any,
     );
   });
 
   it('marks the repository "indexing" before parsing starts', async () => {
-    extractor.extract.mockReturnValue({ symbols: [], edges: [] });
+    extractor.extract.mockReturnValue({ symbols: [], edges: [], chunks: [] });
 
     await service.index('repo-id');
 
@@ -64,7 +72,7 @@ describe('IndexingService', () => {
   });
 
   it('clears previously extracted symbols before writing new ones', async () => {
-    extractor.extract.mockReturnValue({ symbols: [], edges: [] });
+    extractor.extract.mockReturnValue({ symbols: [], edges: [], chunks: [] });
 
     await service.index('repo-id');
 
@@ -94,6 +102,7 @@ describe('IndexingService', () => {
         },
       ],
       edges: [{ fromKey: 'b', toKey: 'a', kind: 'calls' }],
+      chunks: [],
     });
 
     const result = await service.index('repo-id');
@@ -128,6 +137,7 @@ describe('IndexingService', () => {
         },
       ],
       edges: [{ fromKey: 'a', toKey: 'missing', kind: 'calls' }],
+      chunks: [],
     });
 
     const result = await service.index('repo-id');
@@ -137,7 +147,7 @@ describe('IndexingService', () => {
   });
 
   it('marks the repository "ready" with the head commit once indexing succeeds', async () => {
-    extractor.extract.mockReturnValue({ symbols: [], edges: [] });
+    extractor.extract.mockReturnValue({ symbols: [], edges: [], chunks: [] });
 
     await service.index('repo-id');
 
@@ -150,7 +160,7 @@ describe('IndexingService', () => {
   });
 
   it('returns the repository as updated by that final "ready" call, not a stale earlier read', async () => {
-    extractor.extract.mockReturnValue({ symbols: [], edges: [] });
+    extractor.extract.mockReturnValue({ symbols: [], edges: [], chunks: [] });
     repositoriesService.update.mockImplementation((_id: string, changes: Record<string, unknown>) =>
       Promise.resolve({ id: 'repo-id', ...changes }),
     );
@@ -183,6 +193,72 @@ describe('IndexingService', () => {
     expect(repositoriesService.update).toHaveBeenLastCalledWith('repo-id', {
       status: 'failed',
       error: 'parse error',
+    });
+  });
+
+  describe('chunks', () => {
+    const fooSymbol = {
+      key: 'a',
+      name: 'Foo',
+      qualifiedName: 'Foo',
+      kind: 'class',
+      filePath: 'foo.ts',
+      startLine: 1,
+      endLine: 5,
+    };
+    const barChunk = {
+      symbolKey: 'a',
+      content: '// foo.ts — Foo.bar\nbar() {}',
+      filePath: 'foo.ts',
+      startLine: 2,
+      endLine: 3,
+    };
+
+    it('deletes previously embedded chunks for the repository before writing new ones', async () => {
+      extractor.extract.mockReturnValue({ symbols: [], edges: [], chunks: [] });
+
+      await service.index('repo-id');
+
+      expect(dataSource.query).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM "chunks"'),
+        ['repo-id'],
+      );
+    });
+
+    it('embeds each chunk and inserts it with the resolved symbol id and a vector cast', async () => {
+      extractor.extract.mockReturnValue({ symbols: [fooSymbol], edges: [], chunks: [barChunk] });
+
+      const result = await service.index('repo-id');
+
+      expect(embeddings.embed).toHaveBeenCalledWith(barChunk.content);
+
+      const fooId = symbols.create.mock.results[0].value.id;
+      expect(dataSource.query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO "chunks"'),
+        [
+          'repo-id',
+          fooId,
+          barChunk.content,
+          barChunk.filePath,
+          barChunk.startLine,
+          barChunk.endLine,
+          '[0.1,0.2,0.3]',
+        ],
+      );
+      expect(result.chunksEmbedded).toBe(1);
+    });
+
+    it('skips a chunk whose symbolKey does not resolve, without embedding it', async () => {
+      extractor.extract.mockReturnValue({
+        symbols: [],
+        edges: [],
+        chunks: [{ ...barChunk, symbolKey: 'no-such-symbol' }],
+      });
+
+      const result = await service.index('repo-id');
+
+      expect(embeddings.embed).not.toHaveBeenCalled();
+      expect(result.chunksEmbedded).toBe(0);
     });
   });
 });

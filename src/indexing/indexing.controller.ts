@@ -13,10 +13,11 @@ export class IndexingController {
   @Post(':id/index')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Parse a repository and (re)build its symbol graph',
+    summary: 'Parse a repository and (re)build its symbol graph and chunk index',
     description:
-      'Runs the TypeScript compiler over the repository via ts-morph and replaces any ' +
-      'previously extracted symbols and edges. Requires a tsconfig.json at the repository root.',
+      'Runs the TypeScript compiler over the repository via ts-morph, replacing any ' +
+      'previously extracted symbols, edges and chunks. Requires a tsconfig.json at the ' +
+      'repository root.',
   })
   async index(@Param('id', ParseUUIDPipe) id: string): Promise<IndexResultDto> {
     const result = await this.indexing.index(id);
@@ -24,6 +25,7 @@ export class IndexingController {
       repository: RepositoryResponseDto.from(result.repository),
       symbolsExtracted: result.symbolsExtracted,
       edgesDiscovered: result.edgesDiscovered,
+      chunksEmbedded: result.chunksEmbedded,
     };
   }
 }
