@@ -23,7 +23,7 @@ Early — v0.1.0 is in progress. What actually works today:
 - [x] Schema for `repositories`, `symbols`, `edges`, `chunks`
 - [x] Inherited foundation: JWT auth, Postgres, Redis, pluggable embeddings (local ONNX by default), Docker, CI, Swagger
 - [x] **`impact`** — `GET /repositories/:id/impact?symbol=X` reverse-walks the call graph for direct and transitive callers, the modules they live in, and spec files that may cover them (by filename convention — see below). No LLM.
-- [ ] AST-aware chunking and embedding (Day 4)
+- [x] **AST-aware chunking and embedding** — `POST /repositories/:id/index` also chunks every method/function/interface (one chunk per symbol, full source + a context header, not an arbitrary character slice) and embeds it via the pluggable embeddings pipeline. Classes aren't chunked as their own unit — see [docs](#chunking) below.
 - [ ] `ask` — hybrid retrieval with `file:line` citations (Day 5)
 - [ ] `map` — Mermaid architecture diagrams (Day 6)
 - [ ] Retrieval eval harness (Day 6)
@@ -75,7 +75,8 @@ Real output from running this against [nestjs-ai-starter](https://github.com/Niv
 {
   "repository": { "name": "NivL1/nestjs-ai-starter", "status": "ready", "indexedCommit": "7822fa7…" },
   "symbolsExtracted": 78,
-  "edgesDiscovered": 31
+  "edgesDiscovered": 31,
+  "chunksEmbedded": 46
 }
 ```
 
@@ -111,6 +112,20 @@ Real output — direct callers at depth 1, their own callers at depth 2, correct
 ```
 
 If a symbol name matches more than one thing (overloads, or same name in different files), the API returns `409 Conflict` with every candidate's id instead of guessing — retry with `symbolId` instead of `symbol`.
+
+## Chunking
+
+Indexing also chunks every method, function and interface — one chunk per symbol, its full source plus a `// file — QualifiedName` header, embedded via the same pluggable pipeline as `nestjs-ai-starter`. Classes aren't chunked as their own unit: a class's text already contains every one of its methods, which are separately chunked, so a whole-class chunk would duplicate that content and risk silent truncation by the embedding model's token limit.
+
+This is what makes semantic search over code actually work, instead of the near-random matches a naive/stub embedding produces (see [`nestjs-ai-starter`](https://github.com/NivL1/nestjs-ai-starter)'s original hash-based stub, where "caching" scored a Postgres doc above the actual Redis-caching doc). Querying the real index here for *"how do I cache an embedding to avoid recomputing it"* correctly ranks:
+
+```
+EmbeddingCacheService.cacheKey   distance 0.39
+EmbeddingCacheService.embed      distance 0.53
+LocalEmbeddingsProvider.embed    distance 0.55
+```
+
+— found by meaning: `embed` and `LocalEmbeddingsProvider.embed` rank highly despite matching none of the query's actual words ("cache", "recomputing"), because their code *does* what the query describes.
 
 ## Testing
 

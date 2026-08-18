@@ -13,4 +13,11 @@ export class IndexResultDto {
     description: 'calls / implements / extends / injects relationships found.',
   })
   edgesDiscovered!: number;
+
+  @ApiProperty({
+    example: 46,
+    description:
+      'Methods, functions and interfaces embedded into the vector index (classes are not chunked).',
+  })
+  chunksEmbedded!: number;
 }

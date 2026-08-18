@@ -13,3 +13,4 @@ docker-compose*.yml
 .dockerignore
 .github
 .workspace
+.cache

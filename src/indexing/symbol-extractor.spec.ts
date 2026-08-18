@@ -5,7 +5,7 @@ const FIXTURE_ROOT = join(__dirname, '../../test/fixtures/symbol-extraction');
 const TSCONFIG = join(FIXTURE_ROOT, 'tsconfig.json');
 
 describe('SymbolExtractor', () => {
-  const { symbols, edges } = new SymbolExtractor().extract(FIXTURE_ROOT, TSCONFIG);
+  const { symbols, edges, chunks } = new SymbolExtractor().extract(FIXTURE_ROOT, TSCONFIG);
 
   const byQualifiedName = (name: string): ExtractedSymbol => {
     const found = symbols.find((s) => s.qualifiedName === name);
@@ -64,5 +64,41 @@ describe('SymbolExtractor', () => {
 
   it('excludes .spec.ts files from extraction', () => {
     expect(symbols.some((s) => s.qualifiedName === 'buildService')).toBe(false);
+  });
+
+  describe('chunks', () => {
+    const chunkFor = (symbolKey: string) => {
+      const found = chunks.find((c) => c.symbolKey === symbolKey);
+      if (!found) throw new Error(`no chunk found for symbolKey "${symbolKey}"`);
+      return found;
+    };
+
+    it('emits one chunk per method, function and interface', () => {
+      expect(chunkFor(byQualifiedName('EnglishGreeterService.greet').key)).toBeDefined();
+      expect(chunkFor(byQualifiedName('formatName').key)).toBeDefined();
+      expect(chunkFor(byQualifiedName('Greeter').key)).toBeDefined();
+    });
+
+    it('does not emit a chunk for classes themselves', () => {
+      const classKey = byQualifiedName('EnglishGreeterService').key;
+      expect(chunks.some((c) => c.symbolKey === classKey)).toBe(false);
+    });
+
+    it('includes the leading JSDoc comment in the chunk content', () => {
+      const chunk = chunkFor(byQualifiedName('EnglishGreeterService.greet').key);
+      expect(chunk.content).toContain('Greets a person by their first name only, in English.');
+    });
+
+    it('prefixes content with a file/qualified-name header', () => {
+      const chunk = chunkFor(byQualifiedName('formatName').key);
+      expect(chunk.content.split('\n')[0]).toBe('// src/format-name.ts — formatName');
+    });
+
+    it('records the declaration line range, not the JSDoc-inclusive one', () => {
+      const symbol = byQualifiedName('EnglishGreeterService.greet');
+      const chunk = chunkFor(symbol.key);
+      expect(chunk.startLine).toBe(symbol.startLine);
+      expect(chunk.endLine).toBe(symbol.endLine);
+    });
   });
 });

@@ -33,11 +33,13 @@ RUN apt-get update \
 COPY --chown=node:node package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY --from=builder --chown=node:node /app/dist ./dist
-# WORKSPACE_DIR (./.workspace, i.e. /app/.workspace) is created here with
-# node:node ownership: WORKDIR itself is created by root, so without this
-# the non-root `node` user below gets EACCES the first time it tries to
-# mkdir a workspace for a cloned repository.
-RUN mkdir -p /app/.workspace && chown node:node /app/.workspace
+# WORKSPACE_DIR and ONNX_CACHE_DIR are created here with node:node
+# ownership: WORKDIR itself is created by root, so without this the
+# non-root `node` user below gets EACCES — on .workspace the first time it
+# clones a repository, and on .cache the first time it loads the ONNX
+# model (whose OWN default cache dir is inside node_modules, root-owned,
+# which is why ONNX_CACHE_DIR redirects it here instead).
+RUN mkdir -p /app/.workspace /app/.cache && chown node:node /app/.workspace /app/.cache
 USER node
 EXPOSE 3000
 CMD ["node", "dist/main.js"]

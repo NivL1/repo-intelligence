@@ -29,9 +29,19 @@ export interface ExtractedEdge {
   kind: EdgeKind;
 }
 
+export interface ExtractedChunk {
+  /** Matches an ExtractedSymbol.key — resolved to a database id at persist time. */
+  symbolKey: string;
+  content: string;
+  filePath: string;
+  startLine: number;
+  endLine: number;
+}
+
 export interface ExtractionResult {
   symbols: ExtractedSymbol[];
   edges: ExtractedEdge[];
+  chunks: ExtractedChunk[];
 }
 
 type CallableDeclaration = MethodDeclaration | FunctionDeclaration;
@@ -46,10 +56,10 @@ type CallableDeclaration = MethodDeclaration | FunctionDeclaration;
 const TEST_FILE_PATTERN = /\.(spec|test)\.tsx?$/;
 
 /**
- * Parses a TypeScript project with the compiler (via ts-morph) into a flat
- * list of symbols and the edges between them. No database dependency —
- * pure in, pure out — so it's testable against a fixture project with no
- * NestJS bootstrap or Postgres involved.
+ * Parses a TypeScript project with the compiler (via ts-morph) — one pass,
+ * feeding two indexes. No database dependency — pure in, pure out — so
+ * it's testable against a fixture project with no NestJS bootstrap or
+ * Postgres involved.
  *
  * Deliberately narrow for v1: top-level classes, their methods, top-level
  * functions, and interfaces — not arrow-function-as-const, nested
@@ -62,6 +72,14 @@ const TEST_FILE_PATTERN = /\.(spec|test)\.tsx?$/;
  * types resolve. Decorator metadata and library-typed signatures may be
  * less precise without node_modules present, but that's not something v1
  * depends on.
+ *
+ * Chunks (one per method/function/interface, for embedding) deliberately
+ * exclude classes as their own unit: a class's full text already includes
+ * every one of its methods, which are themselves separately chunked — a
+ * whole-class chunk would duplicate that content and, worse, risk being
+ * silently truncated by the embedding model's token limit with no
+ * indication which part got cut. A class's own symbol row (name, file,
+ * line range) is still recorded for the graph; it just isn't embedded.
  */
 @Injectable()
 export class SymbolExtractor {
@@ -69,6 +87,7 @@ export class SymbolExtractor {
     const project = new Project({ tsConfigFilePath });
 
     const symbols: ExtractedSymbol[] = [];
+    const chunks: ExtractedChunk[] = [];
     const nodeToKey = new Map<Node, string>();
     const callables: CallableDeclaration[] = [];
     const classes: ClassDeclaration[] = [];
@@ -88,13 +107,14 @@ export class SymbolExtractor {
       for (const cls of file.getClasses()) {
         const className = cls.getName();
         if (!className) continue; // anonymous default-export class: out of scope for v1
+        // Not chunked — see the class-level doc comment on this class.
         this.register(symbols, nodeToKey, cls, className, className, 'class', relativePath);
         classes.push(cls);
 
         for (const method of cls.getMethods()) {
           const methodName = method.getName();
           const qualifiedName = `${className}.${methodName}`;
-          this.register(
+          const key = this.register(
             symbols,
             nodeToKey,
             method,
@@ -104,19 +124,22 @@ export class SymbolExtractor {
             relativePath,
           );
           callables.push(method);
+          chunks.push(this.buildChunk(key, method, qualifiedName, relativePath));
         }
       }
 
       for (const iface of file.getInterfaces()) {
         const name = iface.getName();
-        this.register(symbols, nodeToKey, iface, name, name, 'interface', relativePath);
+        const key = this.register(symbols, nodeToKey, iface, name, name, 'interface', relativePath);
+        chunks.push(this.buildChunk(key, iface, name, relativePath));
       }
 
       for (const fn of file.getFunctions()) {
         const name = fn.getName();
         if (!name) continue;
-        this.register(symbols, nodeToKey, fn, name, name, 'function', relativePath);
+        const key = this.register(symbols, nodeToKey, fn, name, name, 'function', relativePath);
         callables.push(fn);
+        chunks.push(this.buildChunk(key, fn, name, relativePath));
       }
     }
 
@@ -126,7 +149,7 @@ export class SymbolExtractor {
       ...this.extractInjectionEdges(classes, nodeToKey),
     ]);
 
-    return { symbols, edges };
+    return { symbols, edges, chunks };
   }
 
   private register(
@@ -137,7 +160,7 @@ export class SymbolExtractor {
     qualifiedName: string,
     kind: SymbolKind,
     filePath: string,
-  ): void {
+  ): string {
     const startLine = node.getStartLineNumber();
     // filePath + qualifiedName alone would collide on legitimate method
     // overloads (same signature name declared twice); the line makes every
@@ -153,6 +176,28 @@ export class SymbolExtractor {
       startLine,
       endLine: node.getEndLineNumber(),
     });
+    return key;
+  }
+
+  /**
+   * content includes the leading JSDoc comment (real semantic signal for
+   * embedding) via getText(true) — but startLine/endLine deliberately stay
+   * the declaration's own range, not JSDoc-inclusive, since a citation
+   * should point a reader at the code, not the comment above it.
+   */
+  private buildChunk(
+    symbolKey: string,
+    node: Node,
+    qualifiedName: string,
+    filePath: string,
+  ): ExtractedChunk {
+    return {
+      symbolKey,
+      content: `// ${filePath} — ${qualifiedName}\n${node.getText(true).trim()}`,
+      filePath,
+      startLine: node.getStartLineNumber(),
+      endLine: node.getEndLineNumber(),
+    };
   }
 
   private extractCallEdges(

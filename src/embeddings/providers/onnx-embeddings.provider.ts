@@ -12,12 +12,18 @@ type FeatureExtractionPipeline = (
  * (ONNX runtime, pure JS/WASM) — no API key, no network call per request,
  * free. Default model is Xenova/all-MiniLM-L6-v2 (384 dims); EMBEDDING_DIMENSIONS
  * must match whatever ONNX_EMBEDDING_MODEL actually outputs, or inserts into
- * the pgvector `documents.embedding` column will fail dimension checks.
+ * the pgvector `chunks.embedding` column will fail dimension checks.
  *
  * @xenova/transformers is ESM-only, so it's loaded via dynamic import()
  * from this CommonJS-compiled codebase. The pipeline itself downloads and
- * caches the model on first use (under `.cache/` by default) and is built
- * once per process, not per request.
+ * caches the model on first use, and is built once per process, not per
+ * request.
+ *
+ * The library's OWN default cache directory is inside its node_modules
+ * install path, not the app's working directory — root-owned in the
+ * Docker image, so the non-root runtime user gets EACCES and silently
+ * re-downloads the model on every restart instead of caching it. ONNX_CACHE_DIR
+ * redirects env.cacheDir to somewhere the app actually owns.
  */
 @Injectable()
 export class OnnxEmbeddingsProvider implements EmbeddingsProvider {
@@ -34,9 +40,11 @@ export class OnnxEmbeddingsProvider implements EmbeddingsProvider {
   private getPipeline(): Promise<FeatureExtractionPipeline> {
     if (!this.pipelinePromise) {
       const model = this.config.get<string>('embeddings.onnxModel') ?? 'Xenova/all-MiniLM-L6-v2';
-      this.pipelinePromise = import('@xenova/transformers').then(({ pipeline }) =>
-        pipeline('feature-extraction', model),
-      ) as Promise<FeatureExtractionPipeline>;
+      const cacheDir = this.config.get<string>('embeddings.onnxCacheDir') ?? './.cache';
+      this.pipelinePromise = import('@xenova/transformers').then(({ env, pipeline }) => {
+        env.cacheDir = cacheDir;
+        return pipeline('feature-extraction', model);
+      }) as Promise<FeatureExtractionPipeline>;
     }
     return this.pipelinePromise;
   }
