@@ -88,6 +88,24 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   ONNX_CACHE_DIR: string = './.cache';
+
+  // Ollama by default, not OpenAI — same reasoning as embeddings: v0.1.0
+  // shouldn't require a paid API key to run `ask` end to end.
+  @IsIn(['ollama', 'openai', 'stub'])
+  @IsOptional()
+  LLM_PROVIDER: string = 'ollama';
+
+  @IsString()
+  @IsOptional()
+  OLLAMA_LLM_MODEL: string = 'llama3.2';
+
+  @IsString()
+  @IsOptional()
+  OPENAI_LLM_MODEL: string = 'gpt-4o-mini';
+
+  @IsInt()
+  @IsOptional()
+  LLM_CACHE_TTL_SECONDS: number = 2592000;
 }
 
 /**
@@ -132,6 +150,14 @@ export interface AppConfig {
     cacheTtlSeconds: number;
   };
   workspaceDir: string;
+  llm: {
+    provider: string;
+    ollamaBaseUrl: string;
+    ollamaModel: string;
+    openaiApiKey: string;
+    openaiModel: string;
+    cacheTtlSeconds: number;
+  };
 }
 
 export function configuration(): AppConfig {
@@ -163,5 +189,17 @@ export function configuration(): AppConfig {
       cacheTtlSeconds: parseInt(process.env.EMBEDDING_CACHE_TTL_SECONDS ?? '2592000', 10),
     },
     workspaceDir: process.env.WORKSPACE_DIR ?? './.workspace',
+    llm: {
+      provider: process.env.LLM_PROVIDER ?? 'ollama',
+      // Same Ollama server, same OpenAI key as embeddings — deliberately
+      // read directly from the same env vars rather than reaching into
+      // `embeddings.*` from the llm module, so each config section stays
+      // self-contained and independently readable.
+      ollamaBaseUrl: process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434',
+      ollamaModel: process.env.OLLAMA_LLM_MODEL ?? 'llama3.2',
+      openaiApiKey: process.env.OPENAI_API_KEY ?? '',
+      openaiModel: process.env.OPENAI_LLM_MODEL ?? 'gpt-4o-mini',
+      cacheTtlSeconds: parseInt(process.env.LLM_CACHE_TTL_SECONDS ?? '2592000', 10),
+    },
   };
 }

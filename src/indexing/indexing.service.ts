@@ -4,6 +4,7 @@ import { join } from 'path';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository as TypeOrmRepository } from 'typeorm';
+import { toVectorLiteral } from '../database/vector-literal';
 import { EmbeddingCacheService } from '../embeddings/embedding-cache.service';
 import { Repository } from '../repositories/entities/repository.entity';
 import { RepositoriesService } from '../repositories/repositories.service';
@@ -165,9 +166,4 @@ export class IndexingService {
       );
     }
   }
-}
-
-/** pgvector's text input format for a vector literal, e.g. "[0.1,0.2,0.3]". */
-function toVectorLiteral(vector: number[]): string {
-  return `[${vector.join(',')}]`;
 }

@@ -10,6 +10,8 @@ import { EmbeddingsModule } from './embeddings/embeddings.module';
 import { RepositoriesModule } from './repositories/repositories.module';
 import { IndexingModule } from './indexing/indexing.module';
 import { ImpactModule } from './impact/impact.module';
+import { LlmModule } from './llm/llm.module';
+import { AskModule } from './ask/ask.module';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { ImpactModule } from './impact/impact.module';
     RepositoriesModule,
     IndexingModule,
     ImpactModule,
+    LlmModule,
+    AskModule,
   ],
 })
 export class AppModule {}
