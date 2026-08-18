@@ -143,6 +143,7 @@ describe('AskService', () => {
     const [prompt] = llm.complete.mock.calls[0];
     const lines = (prompt as string).split('\n');
     const questionIndex = lines.indexOf('Question:');
+    expect(questionIndex).toBeGreaterThan(-1);
     const [, boundary, questionLine, closingBoundary] = lines.slice(questionIndex);
 
     // The attacker's text is inert: it sits whole, on its own line,
