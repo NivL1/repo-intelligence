@@ -44,9 +44,18 @@ interface ChunkRow {
 /**
  * Hybrid retrieval: vector similarity (fuzzy, conceptual) blended with
  * exact symbol-name matches (precise, structural) and one hop of outgoing
- * `calls` edges from whatever either of those found — pulls in code a
+ * `calls` edges from whatever EITHER of those found — pulls in code a
  * pure vector search would miss because it doesn't share the query's
  * words (e.g. the cache layer behind a service method the query names).
+ *
+ * "Either" is deliberate, not an oversight: graph expansion seeds off
+ * vector hits too, not just exact symbol matches. This is the actual
+ * headline case — a vector-only hit like `SearchService.search` for
+ * "how does semantic search work?" is exactly the kind of result that
+ * should pull in what it calls, even though nothing else in the answer
+ * shares the query's words. Narrowing this to symbol-matches-only would
+ * quietly break that case. (Confirmed working end-to-end against a real
+ * repo + real LLM — see CLAUDE.md's Day 5 notes.)
  *
  * Merge priority when the combined count exceeds `limit`: exact symbol
  * matches first, then their one-hop callees, then vector hits by
