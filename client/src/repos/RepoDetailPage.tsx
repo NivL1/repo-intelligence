@@ -6,18 +6,18 @@ import { AskPanel } from './panels/AskPanel';
 import { ImpactPanel } from './panels/ImpactPanel';
 import { MapPanel } from './panels/MapPanel';
 
-type Tab = 'impact' | 'map' | 'ask';
+type Tab = 'map' | 'ask' | 'impact';
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'impact', label: 'Impact' },
   { id: 'map', label: 'Map' },
   { id: 'ask', label: 'Ask' },
+  { id: 'impact', label: 'Impact' },
 ];
 
 export function RepoDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [repo, setRepo] = useState<Repository | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>('impact');
+  const [tab, setTab] = useState<Tab>('map');
 
   useEffect(() => {
     if (!id) return;
@@ -55,9 +55,9 @@ export function RepoDetailPage() {
             ))}
           </nav>
 
-          {tab === 'impact' && <ImpactPanel repoId={repo.id} />}
           {tab === 'map' && <MapPanel repoId={repo.id} />}
           {tab === 'ask' && <AskPanel repo={repo} />}
+          {tab === 'impact' && <ImpactPanel repoId={repo.id} />}
         </>
       )}
     </div>

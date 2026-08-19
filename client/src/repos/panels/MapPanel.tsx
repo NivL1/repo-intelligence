@@ -38,6 +38,13 @@ export function MapPanel({ repoId }: { repoId: string }) {
 
   return (
     <div className="panel">
+      <p className="panel-description">
+        Architecture diagram rendered straight from the symbol graph — module-level
+        coupling by default, or zoom into one module to see its actual classes, methods
+        and interfaces. No LLM: the same indexed commit always renders the exact same
+        diagram, byte for byte.
+      </p>
+
       <div className="map-toolbar">
         <form onSubmit={handleZoom} className="zoom-form">
           <input

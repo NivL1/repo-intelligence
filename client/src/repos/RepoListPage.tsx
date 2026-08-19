@@ -65,6 +65,16 @@ export function RepoListPage() {
         )}
       </header>
 
+      <p className="intro">
+        repo-intelligence analyzes TypeScript repositories two ways: a compiler-built
+        symbol graph for exact, structural questions ("what calls this?"), and AST-aware
+        embeddings for fuzzy, conceptual ones ("how does auth work?").{' '}
+        {demoMode
+          ? 'The repository below has already been indexed this way — open it to explore.'
+          : 'Paste a GitHub URL below and it gets cloned, parsed by the TypeScript ' +
+            'compiler, and embedded automatically before you can explore it.'}
+      </p>
+
       {!demoMode && (
         <>
           <form className="add-repo-form" onSubmit={handleAdd}>

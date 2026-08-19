@@ -1,9 +1,11 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { ApiError } from '../../api/client';
 import { getImpact } from '../../api/impact';
-import type { AmbiguousSymbolBody, ImpactResult } from '../../api/types';
+import { listSymbols } from '../../api/symbols';
+import type { AmbiguousSymbolBody, ImpactResult, SymbolSummary } from '../../api/types';
 
 const DEFAULT_DEPTH = 3;
+const SYMBOLS_DATALIST_ID = 'impact-symbol-options';
 
 export function ImpactPanel({ repoId }: { repoId: string }) {
   const [symbol, setSymbol] = useState('');
@@ -12,6 +14,16 @@ export function ImpactPanel({ repoId }: { repoId: string }) {
   const [candidates, setCandidates] = useState<AmbiguousSymbolBody['candidates']>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [symbolOptions, setSymbolOptions] = useState<SymbolSummary[]>([]);
+
+  useEffect(() => {
+    // Best-effort — a visitor has no way to already know a valid name to
+    // type, unlike someone who wrote the indexed repo themselves. If this
+    // fails, the input still works as free text; it just loses autocomplete.
+    listSymbols(repoId)
+      .then(setSymbolOptions)
+      .catch(() => setSymbolOptions([]));
+  }, [repoId]);
 
   async function runAnalysis(query: { symbol?: string; symbolId?: string }) {
     setLoading(true);
@@ -41,13 +53,26 @@ export function ImpactPanel({ repoId }: { repoId: string }) {
 
   return (
     <div className="panel">
+      <p className="panel-description">
+        Pick a symbol below and see everything that calls it — directly and transitively —
+        which modules that touches, and which test files might cover it. Pure graph
+        traversal over the compiler-built call graph: deterministic, no LLM involved, and
+        the same answer every time for the same indexed commit.
+      </p>
+
       <form className="panel-form" onSubmit={handleSubmit}>
         <input
           type="text"
-          placeholder="SearchService.search"
+          list={SYMBOLS_DATALIST_ID}
+          placeholder={symbolOptions.length ? 'Pick or type a symbol…' : 'SearchService.search'}
           value={symbol}
           onChange={(e) => setSymbol(e.target.value)}
         />
+        <datalist id={SYMBOLS_DATALIST_ID}>
+          {symbolOptions.map((s) => (
+            <option key={s.id} value={s.qualifiedName} />
+          ))}
+        </datalist>
         <input
           type="number"
           min={1}
