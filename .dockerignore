@@ -3,7 +3,6 @@ npm-debug.log
 dist
 *.tsbuildinfo
 coverage
-client
 .git
 .gitignore
 .env
