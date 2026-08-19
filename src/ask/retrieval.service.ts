@@ -145,7 +145,13 @@ export class RetrievalService {
     // exact-name query for a symbol vector search also happens to surface
     // can get that very symbol truncated away by lower-value graph hits.
     const vectorExact = vectorRows.filter((r) => r.symbolId && symbolMatchIds.has(r.symbolId));
-    const vectorOnly = vectorRows.filter((r) => !r.symbolId || !symbolMatchIds.has(r.symbolId));
+    // Named to avoid colliding with the `options.vectorOnly` ablation flag
+    // above — same word, unrelated meaning, and a rename here means a
+    // future reader (or a refactor that moves this below the flag's own
+    // read) can't mistake one for the other.
+    const plainVectorRows = vectorRows.filter(
+      (r) => !r.symbolId || !symbolMatchIds.has(r.symbolId),
+    );
 
     // Symbol-exact hits before graph-expansion hits before vector hits —
     // see the class doc comment on why this order matters for truncation.
@@ -157,7 +163,7 @@ export class RetrievalService {
       ...extraChunks
         .filter((c) => !symbolMatchIds.has(c.symbolId))
         .map((c) => toRetrievedChunk(c, 'graph')),
-      ...vectorOnly.map(toVectorChunk),
+      ...plainVectorRows.map(toVectorChunk),
     ];
 
     const seen = new Set<string>();

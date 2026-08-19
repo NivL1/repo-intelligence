@@ -56,6 +56,7 @@ export function scoreQuestion(
     k,
   );
   const expected = new Set(question.expect);
+  const rankedSet = new Set(ranked);
 
   const hits = ranked.filter((name) => expected.has(name));
   const firstHitIndex = ranked.findIndex((name) => expected.has(name));
@@ -66,7 +67,7 @@ export function scoreQuestion(
     expected: question.expect,
     retrieved: ranked,
     hits,
-    missing: question.expect.filter((name) => !ranked.includes(name)),
+    missing: question.expect.filter((name) => !rankedSet.has(name)),
     recall: hits.length / question.expect.length,
     reciprocalRank: firstHitIndex === -1 ? 0 : 1 / (firstHitIndex + 1),
   };
