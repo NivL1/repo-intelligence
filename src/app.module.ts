@@ -1,5 +1,7 @@
+import { join } from 'path';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ServeStaticModule } from '@nestjs/serve-static';
 import { configuration, validateEnv } from './config/configuration';
 import { DatabaseModule } from './database/database.module';
 import { RedisModule } from './redis/redis.module';
@@ -33,6 +35,30 @@ import { AskModule } from './ask/ask.module';
     MapModule,
     LlmModule,
     AskModule,
+    // Serves the dashboard's production build from the same origin and
+    // port as the API — the Dockerfile builds client/ into a separate
+    // stage and copies its output here (see the `client-builder` stage).
+    // Only meaningful in that container: nothing builds client-dist for
+    // a bare `npm run start:dev`, so this module quietly serves nothing
+    // outside Docker, same as it does for any excluded API path.
+    //
+    // `exclude` is load-bearing, not decorative: ServeStaticModule
+    // registers a catch-all GET '*' that renders index.html (the SPA
+    // fallback client-side routing needs — a hard refresh on
+    // /repos/:id has to still work), and without excluding every
+    // existing API prefix that catch-all would intercept them before
+    // their own controllers ever see the request.
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'client-dist'),
+      exclude: [
+        '/auth/(.*)',
+        '/repositories/(.*)',
+        '/health/(.*)',
+        '/docs/(.*)',
+        '/docs-json/(.*)',
+        '/docs-yaml/(.*)',
+      ],
+    }),
   ],
 })
 export class AppModule {}

@@ -1,10 +1,20 @@
 {
   "extends": "./tsconfig.json",
-  // `eval` is excluded for two reasons, and the second one bites hard:
-  // it's a dev harness with no place in the production image, AND with it
-  // included TypeScript infers a rootDir of the repo root rather than
-  // src/, which silently moves the entrypoint to dist/src/main.js and
-  // breaks `node dist/main.js`. Keep any future root-level tooling
-  // directory out of this build for the same reason.
-  "exclude": ["node_modules", "test", "eval", "dist", "**/*spec.ts"]
+  "compilerOptions": {
+    // Pinned explicitly rather than left to inference. TypeScript
+    // otherwise infers rootDir as the longest common path of every
+    // compiled input, src/ included — and that set has repeatedly
+    // included something outside src/ by accident (the eval/ dev
+    // harness, the client/ dashboard, even `import ... from
+    // '../package.json'` in main.ts for the Swagger version), each time
+    // silently moving the compiled entrypoint from dist/main.js to
+    // dist/<wherever>/main.js and breaking `node dist/main.js` in the
+    // runtime image with no compile-time error to catch it. Pinning
+    // rootDir makes that whole failure class impossible instead of
+    // chasing it exclusion by exclusion.
+    "rootDir": "./src"
+  },
+  // `eval` and `client` (the dashboard, its own separate Vite/React
+  // project) have no place in the production image regardless of rootDir.
+  "exclude": ["node_modules", "test", "eval", "client", "dist", "**/*spec.ts"]
 }

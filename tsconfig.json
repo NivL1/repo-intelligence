@@ -12,11 +12,18 @@
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
+    "resolveJsonModule": true,
     "strictNullChecks": true,
     "noImplicitAny": true,
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": false,
     "esModuleInterop": true
-  }
+  },
+  // `client/` is a separate Vite/React project with its own tsconfig,
+  // JSX, module resolution and node_modules — it must never be picked up
+  // by the backend's compiler. tsconfig.build.json's own `exclude`
+  // replaces this one entirely rather than merging with it, so `client`
+  // (and `eval`, `test`) has to be listed there too, not just here.
+  "exclude": ["node_modules", "client"]
 }
