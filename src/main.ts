@@ -1,7 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { version } from '../package.json';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -14,12 +16,14 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
+  app.enableCors({ origin: app.get(ConfigService).get<string>('corsOrigin') });
+
   const config = new DocumentBuilder()
     .setTitle('repo-intelligence')
     .setDescription(
       'Codebase intelligence for TypeScript repos: a compiler-built symbol graph plus AST-aware RAG.',
     )
-    .setVersion('0.0.1')
+    .setVersion(version)
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
