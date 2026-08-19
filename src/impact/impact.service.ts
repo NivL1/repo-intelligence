@@ -7,6 +7,7 @@ import { RepositoriesService } from '../repositories/repositories.service';
 import { WorkspaceService } from '../repositories/workspace.service';
 import { Edge } from '../indexing/entities/edge.entity';
 import { CodeSymbol } from '../indexing/entities/symbol.entity';
+import { moduleOf } from '../indexing/module-path';
 import { AmbiguousSymbolException } from './ambiguous-symbol.exception';
 import { DEFAULT_IMPACT_DEPTH, ImpactQueryDto } from './dto/impact-query.dto';
 import { ImpactCallerDto, ImpactResultDto, SymbolSummaryDto } from './dto/impact-result.dto';
@@ -140,16 +141,6 @@ function toSummary(symbol: CodeSymbol): SymbolSummaryDto {
     startLine: symbol.startLine,
     endLine: symbol.endLine,
   };
-}
-
-/**
- * "src/search/search.service.ts" -> "search"; "src/main.ts" -> "src".
- * A heuristic, not a real module boundary — good enough to group blast
- * radius results without needing NestJS-specific module-file parsing.
- */
-function moduleOf(filePath: string): string {
-  const segments = filePath.split('/');
-  return segments[0] === 'src' && segments.length > 2 ? segments[1] : segments[0];
 }
 
 function specCandidates(filePath: string): string[] {

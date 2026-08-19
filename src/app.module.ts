@@ -10,6 +10,7 @@ import { EmbeddingsModule } from './embeddings/embeddings.module';
 import { RepositoriesModule } from './repositories/repositories.module';
 import { IndexingModule } from './indexing/indexing.module';
 import { ImpactModule } from './impact/impact.module';
+import { MapModule } from './map/map.module';
 import { LlmModule } from './llm/llm.module';
 import { AskModule } from './ask/ask.module';
 
@@ -29,6 +30,7 @@ import { AskModule } from './ask/ask.module';
     RepositoriesModule,
     IndexingModule,
     ImpactModule,
+    MapModule,
     LlmModule,
     AskModule,
   ],
