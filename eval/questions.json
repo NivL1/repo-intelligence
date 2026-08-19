@@ -1,0 +1,116 @@
+{
+  "repository": "NivL1/nestjs-ai-starter",
+  "questions": [
+    {
+      "id": "semantic-search",
+      "question": "How does semantic search work?",
+      "expect": ["SearchService.search", "EmbeddingCacheService.embed"],
+      "note": "The headline graph case: the question shares no words with the embeddings layer, but search() calls embed(), so a correct answer needs both."
+    },
+    {
+      "id": "embedding-cache",
+      "question": "How are embeddings cached so they aren't recomputed?",
+      "expect": ["EmbeddingCacheService.embed", "EmbeddingCacheService.cacheKey"]
+    },
+    {
+      "id": "exact-symbol",
+      "question": "What does SearchService.search do?",
+      "expect": ["SearchService.search"],
+      "note": "Names a symbol exactly — exact matching should put it at rank 1 regardless of vector distance."
+    },
+    {
+      "id": "ingest-document",
+      "question": "How do I add a document to the search index?",
+      "expect": ["SearchService.ingest", "SearchController.ingest"]
+    },
+    {
+      "id": "login",
+      "question": "How does user login work?",
+      "expect": ["AuthService.login", "UsersService.findByEmail"],
+      "note": "login() calls findByEmail() — the user lookup is one hop away and shares none of the question's wording."
+    },
+    {
+      "id": "token-issuing",
+      "question": "How are JWT access and refresh tokens issued?",
+      "expect": ["AuthService.issueTokenPair"]
+    },
+    {
+      "id": "token-refresh",
+      "question": "How does refreshing an expired session work?",
+      "expect": ["AuthService.refresh", "AuthService.issueTokenPair"]
+    },
+    {
+      "id": "logout",
+      "question": "What happens when a user logs out?",
+      "expect": ["AuthService.logout", "UsersService.setRefreshTokenHash"],
+      "note": "logout() clears the stored refresh token hash via the users service."
+    },
+    {
+      "id": "register",
+      "question": "How is a new user account created?",
+      "expect": ["AuthService.register", "UsersService.create"]
+    },
+    {
+      "id": "password-hashing",
+      "question": "How are passwords hashed before being stored?",
+      "expect": ["AuthService.register", "UsersService.create"]
+    },
+    {
+      "id": "find-user",
+      "question": "How do I look up a user by their email address?",
+      "expect": ["UsersService.findByEmail"]
+    },
+    {
+      "id": "provider-interface",
+      "question": "What is the EmbeddingsProvider interface?",
+      "expect": ["EmbeddingsProvider"],
+      "note": "Exact name, and an interface rather than a method — checks that chunked interfaces are retrievable too."
+    },
+    {
+      "id": "redis-health",
+      "question": "How is Redis health checked?",
+      "expect": ["RedisHealthIndicator.isHealthy"]
+    },
+    {
+      "id": "readiness",
+      "question": "What does the readiness probe check?",
+      "expect": ["HealthController.readiness"]
+    },
+    {
+      "id": "liveness-vs-readiness",
+      "question": "What is the difference between the liveness and readiness endpoints?",
+      "expect": ["HealthController.liveness", "HealthController.readiness"]
+    },
+    {
+      "id": "local-embeddings",
+      "question": "How does the local embeddings provider produce a vector?",
+      "expect": ["LocalEmbeddingsProvider.embed"]
+    },
+    {
+      "id": "result-shape",
+      "question": "What fields does a search result contain?",
+      "expect": ["SearchResult", "Document"]
+    },
+    {
+      "id": "vector-similarity",
+      "question": "How is vector similarity computed against the database?",
+      "expect": ["SearchService.search"]
+    },
+    {
+      "id": "auth-endpoints",
+      "question": "Which HTTP endpoints does the auth API expose?",
+      "expect": [
+        "AuthController.register",
+        "AuthController.login",
+        "AuthController.refresh",
+        "AuthController.logout"
+      ],
+      "note": "Four expected symbols against k=5 — a deliberately demanding recall case."
+    },
+    {
+      "id": "refresh-validation",
+      "question": "How does AuthService.refresh validate the token it is given?",
+      "expect": ["AuthService.refresh"]
+    }
+  ]
+}

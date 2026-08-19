@@ -1,4 +1,10 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
+  // `eval` is excluded for two reasons, and the second one bites hard:
+  // it's a dev harness with no place in the production image, AND with it
+  // included TypeScript infers a rootDir of the repo root rather than
+  // src/, which silently moves the entrypoint to dist/src/main.js and
+  // breaks `node dist/main.js`. Keep any future root-level tooling
+  // directory out of this build for the same reason.
+  "exclude": ["node_modules", "test", "eval", "dist", "**/*spec.ts"]
 }

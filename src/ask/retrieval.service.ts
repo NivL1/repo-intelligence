@@ -3,7 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { toVectorLiteral } from '../database/vector-literal';
 import { EmbeddingCacheService } from '../embeddings/embedding-cache.service';
-import { RetrievedChunk } from './retrieval.types';
+import { RetrievalOptions, RetrievedChunk } from './retrieval.types';
 
 const DEFAULT_LIMIT = 10;
 // Matches bare identifiers and dotted qualified names ("search",
@@ -54,13 +54,14 @@ interface ChunkRow {
  * "how does semantic search work?" is exactly the kind of result that
  * should pull in what it calls, even though nothing else in the answer
  * shares the query's words. Narrowing this to symbol-matches-only would
- * quietly break that case. (Confirmed working end-to-end against a real
- * repo + real LLM — see CLAUDE.md's Day 5 notes.)
+ * quietly break that case.
  *
  * Merge priority when the combined count exceeds `limit`: exact symbol
- * matches first, then their one-hop callees, then vector hits by
- * ascending distance. A truncation that dropped the exact-name match in
- * favour of a weak vector hit would defeat the point of having it.
+ * matches first — including one found by vector search too, re-tagged
+ * rather than left to compete on distance — then their one-hop callees,
+ * then plain vector hits by ascending distance. A truncation that dropped
+ * the exact-name match in favour of a weak vector hit would defeat the
+ * point of having it.
  */
 @Injectable()
 export class RetrievalService {
@@ -73,6 +74,7 @@ export class RetrievalService {
     repositoryId: string,
     question: string,
     limit = DEFAULT_LIMIT,
+    options: RetrievalOptions = {},
   ): Promise<RetrievedChunk[]> {
     const embedding = await this.embeddings.embed(question);
 
@@ -87,6 +89,10 @@ export class RetrievalService {
        LIMIT $3`,
       [toVectorLiteral(embedding), repositoryId, limit],
     );
+
+    if (options.vectorOnly) {
+      return vectorRows.map(toVectorChunk).slice(0, limit);
+    }
 
     const tokens = [...new Set(question.match(IDENTIFIER_PATTERN) ?? [])];
     const symbolMatches = tokens.length
@@ -130,25 +136,34 @@ export class RetrievalService {
         )
       : [];
 
+    // A vector hit whose symbol is ALSO an exact name match must not be
+    // judged by distance alongside plain vector noise — it earned its
+    // priority the same way a freshly-fetched exact match did, and
+    // `alreadyCovered` only kept it out of extraChunks to avoid fetching
+    // its chunk twice, not to demote it. Splitting vectorRows here is what
+    // makes that distinction survive into the merge below; without it, an
+    // exact-name query for a symbol vector search also happens to surface
+    // can get that very symbol truncated away by lower-value graph hits.
+    const vectorExact = vectorRows.filter((r) => r.symbolId && symbolMatchIds.has(r.symbolId));
+    // Named to avoid colliding with the `options.vectorOnly` ablation flag
+    // above — same word, unrelated meaning, and a rename here means a
+    // future reader (or a refactor that moves this below the flag's own
+    // read) can't mistake one for the other.
+    const plainVectorRows = vectorRows.filter(
+      (r) => !r.symbolId || !symbolMatchIds.has(r.symbolId),
+    );
+
     // Symbol-exact hits before graph-expansion hits before vector hits —
     // see the class doc comment on why this order matters for truncation.
     const prioritized: RetrievedChunk[] = [
       ...extraChunks
         .filter((c) => symbolMatchIds.has(c.symbolId))
         .map((c) => toRetrievedChunk(c, 'symbol')),
+      ...vectorExact.map((r) => ({ ...toVectorChunk(r), source: 'symbol' as const })),
       ...extraChunks
         .filter((c) => !symbolMatchIds.has(c.symbolId))
         .map((c) => toRetrievedChunk(c, 'graph')),
-      ...vectorRows.map((r): RetrievedChunk => ({
-        id: r.id,
-        content: r.content,
-        filePath: r.filePath,
-        startLine: r.startLine,
-        endLine: r.endLine,
-        qualifiedName: r.qualifiedName,
-        source: 'vector',
-        distance: r.distance,
-      })),
+      ...plainVectorRows.map(toVectorChunk),
     ];
 
     const seen = new Set<string>();
@@ -160,6 +175,19 @@ export class RetrievalService {
 
     return deduped.slice(0, limit);
   }
+}
+
+function toVectorChunk(row: VectorRow): RetrievedChunk {
+  return {
+    id: row.id,
+    content: row.content,
+    filePath: row.filePath,
+    startLine: row.startLine,
+    endLine: row.endLine,
+    qualifiedName: row.qualifiedName,
+    source: 'vector',
+    distance: row.distance,
+  };
 }
 
 function toRetrievedChunk(row: ChunkRow, source: ChunkSourceExtra): RetrievedChunk {

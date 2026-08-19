@@ -181,13 +181,85 @@ describe('RetrievalService', () => {
     const result = await service.retrieve('repo-id', 'SearchService.search');
 
     expect(result).toHaveLength(1);
-    expect(result[0].source).toBe('vector');
+    // Re-tagged 'symbol', not left as 'vector': it's still an exact name
+    // match even though the chunk itself came from the vector query, and
+    // it needs the priority that tag carries into truncation.
+    expect(result[0].source).toBe('symbol');
     // The one symbol already covered by the vector hit shouldn't trigger
     // a redundant "fetch chunks for these ids" query.
     expect(dataSource.query).not.toHaveBeenCalledWith(
       expect.stringContaining('c.symbol_id = ANY'),
       expect.anything(),
     );
+  });
+
+  it('keeps an exact match at the top even when vector search is the only thing that found its chunk', async () => {
+    // Regression case for a real bug found by the eval harness: a symbol
+    // that is BOTH an exact name match AND already present in the vector
+    // results was being left in the plain-vector bucket, ranked by
+    // distance — so weaker graph-expansion hits (which get symbol/graph
+    // priority) could crowd it out of the truncated results entirely, for
+    // the exact symbol the question named.
+    const target = {
+      id: 'target-chunk',
+      content: 'target',
+      filePath: 'target.ts',
+      startLine: 1,
+      endLine: 2,
+      symbolId: 'sym-target',
+      qualifiedName: 'SearchService.search',
+      distance: 0.6, // deliberately a WEAK vector match, ranked last
+    };
+    const strongerVectorNoise = Array.from({ length: 4 }, (_, i) => ({
+      id: `noise-${i}`,
+      content: 'x',
+      filePath: `n${i}.ts`,
+      startLine: 1,
+      endLine: 2,
+      symbolId: `noise-sym-${i}`,
+      qualifiedName: `Noise${i}`,
+      distance: 0.1 * i, // closer than target, but not what was asked about
+    }));
+
+    mockQueries({
+      vector: [...strongerVectorNoise, target],
+      symbol: [{ id: 'sym-target', qualifiedName: 'SearchService.search' }],
+      edges: [{ toSymbolId: 'callee-1' }, { toSymbolId: 'callee-2' }, { toSymbolId: 'callee-3' }],
+      chunks: [
+        {
+          id: 'callee-chunk-1',
+          content: 'callee',
+          filePath: 'callee1.ts',
+          startLine: 1,
+          endLine: 2,
+          symbolId: 'callee-1',
+          qualifiedName: 'Callee1',
+        },
+        {
+          id: 'callee-chunk-2',
+          content: 'callee',
+          filePath: 'callee2.ts',
+          startLine: 1,
+          endLine: 2,
+          symbolId: 'callee-2',
+          qualifiedName: 'Callee2',
+        },
+        {
+          id: 'callee-chunk-3',
+          content: 'callee',
+          filePath: 'callee3.ts',
+          startLine: 1,
+          endLine: 2,
+          symbolId: 'callee-3',
+          qualifiedName: 'Callee3',
+        },
+      ],
+    });
+
+    const result = await service.retrieve('repo-id', 'What does SearchService.search do?', 5);
+
+    expect(result.map((r) => r.id)).toContain('target-chunk');
+    expect(result[0]).toMatchObject({ id: 'target-chunk', source: 'symbol' });
   });
 
   it('truncates to the limit, keeping symbol/graph hits over weaker vector hits', async () => {
@@ -231,5 +303,44 @@ describe('RetrievalService', () => {
     const result = await service.retrieve('repo-id', 'anything at all');
 
     expect(result).toEqual([]);
+  });
+
+  describe('vectorOnly (the eval harness ablation baseline)', () => {
+    const vectorHit = {
+      id: 'c1',
+      content: 'code',
+      filePath: 'a.ts',
+      startLine: 1,
+      endLine: 2,
+      symbolId: 's1',
+      qualifiedName: 'Foo.bar',
+      distance: 0.4,
+    };
+
+    it('returns vector hits without running the symbol or graph queries at all', async () => {
+      // The point of the baseline is that it isolates vector similarity.
+      // If the symbol/edge queries still ran, the comparison would be
+      // measuring something other than what it claims to.
+      mockQueries({
+        vector: [vectorHit],
+        symbol: [{ id: 's9', qualifiedName: 'Foo.bar' }],
+        edges: [{ toSymbolId: 's2' }],
+      });
+
+      const result = await service.retrieve('repo-id', 'Foo.bar', 10, { vectorOnly: true });
+
+      expect(result).toEqual([expect.objectContaining({ id: 'c1', source: 'vector' })]);
+      const executed = dataSource.query.mock.calls.map(([sql]) => sql as string);
+      expect(executed).toHaveLength(1);
+      expect(executed[0]).toContain('ORDER BY distance');
+    });
+
+    it('still embeds the question, so the baseline is a real vector search', async () => {
+      mockQueries({ vector: [vectorHit] });
+
+      await service.retrieve('repo-id', 'how does search work', 10, { vectorOnly: true });
+
+      expect(embeddings.embed).toHaveBeenCalledWith('how does search work');
+    });
   });
 });
