@@ -232,4 +232,43 @@ describe('RetrievalService', () => {
 
     expect(result).toEqual([]);
   });
+
+  describe('vectorOnly (the eval harness ablation baseline)', () => {
+    const vectorHit = {
+      id: 'c1',
+      content: 'code',
+      filePath: 'a.ts',
+      startLine: 1,
+      endLine: 2,
+      symbolId: 's1',
+      qualifiedName: 'Foo.bar',
+      distance: 0.4,
+    };
+
+    it('returns vector hits without running the symbol or graph queries at all', async () => {
+      // The point of the baseline is that it isolates vector similarity.
+      // If the symbol/edge queries still ran, the comparison would be
+      // measuring something other than what it claims to.
+      mockQueries({
+        vector: [vectorHit],
+        symbol: [{ id: 's9', qualifiedName: 'Foo.bar' }],
+        edges: [{ toSymbolId: 's2' }],
+      });
+
+      const result = await service.retrieve('repo-id', 'Foo.bar', 10, { vectorOnly: true });
+
+      expect(result).toEqual([expect.objectContaining({ id: 'c1', source: 'vector' })]);
+      const executed = dataSource.query.mock.calls.map(([sql]) => sql as string);
+      expect(executed).toHaveLength(1);
+      expect(executed[0]).toContain('ORDER BY distance');
+    });
+
+    it('still embeds the question, so the baseline is a real vector search', async () => {
+      mockQueries({ vector: [vectorHit] });
+
+      await service.retrieve('repo-id', 'how does search work', 10, { vectorOnly: true });
+
+      expect(embeddings.embed).toHaveBeenCalledWith('how does search work');
+    });
+  });
 });

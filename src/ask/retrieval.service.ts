@@ -3,7 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { toVectorLiteral } from '../database/vector-literal';
 import { EmbeddingCacheService } from '../embeddings/embedding-cache.service';
-import { RetrievedChunk } from './retrieval.types';
+import { RetrievalOptions, RetrievedChunk } from './retrieval.types';
 
 const DEFAULT_LIMIT = 10;
 // Matches bare identifiers and dotted qualified names ("search",
@@ -72,6 +72,7 @@ export class RetrievalService {
     repositoryId: string,
     question: string,
     limit = DEFAULT_LIMIT,
+    options: RetrievalOptions = {},
   ): Promise<RetrievedChunk[]> {
     const embedding = await this.embeddings.embed(question);
 
@@ -86,6 +87,10 @@ export class RetrievalService {
        LIMIT $3`,
       [toVectorLiteral(embedding), repositoryId, limit],
     );
+
+    if (options.vectorOnly) {
+      return vectorRows.map(toVectorChunk).slice(0, limit);
+    }
 
     const tokens = [...new Set(question.match(IDENTIFIER_PATTERN) ?? [])];
     const symbolMatches = tokens.length
@@ -138,16 +143,7 @@ export class RetrievalService {
       ...extraChunks
         .filter((c) => !symbolMatchIds.has(c.symbolId))
         .map((c) => toRetrievedChunk(c, 'graph')),
-      ...vectorRows.map((r): RetrievedChunk => ({
-        id: r.id,
-        content: r.content,
-        filePath: r.filePath,
-        startLine: r.startLine,
-        endLine: r.endLine,
-        qualifiedName: r.qualifiedName,
-        source: 'vector',
-        distance: r.distance,
-      })),
+      ...vectorRows.map(toVectorChunk),
     ];
 
     const seen = new Set<string>();
@@ -159,6 +155,19 @@ export class RetrievalService {
 
     return deduped.slice(0, limit);
   }
+}
+
+function toVectorChunk(row: VectorRow): RetrievedChunk {
+  return {
+    id: row.id,
+    content: row.content,
+    filePath: row.filePath,
+    startLine: row.startLine,
+    endLine: row.endLine,
+    qualifiedName: row.qualifiedName,
+    source: 'vector',
+    distance: row.distance,
+  };
 }
 
 function toRetrievedChunk(row: ChunkRow, source: ChunkSourceExtra): RetrievedChunk {
