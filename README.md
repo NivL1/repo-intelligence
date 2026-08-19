@@ -16,7 +16,7 @@ Two of the three never touch an LLM, so their answers are reproducible rather th
 
 ## Status
 
-**v0.1.0.** What works:
+**v0.2.0.** What works:
 
 - [x] **Repository registration** — clone an https:// git URL or reference a local checkout, tracked through a `pending → indexing → ready` lifecycle
 - [x] **Symbol graph extraction** — `POST /repositories/:id/index` parses a TypeScript project with the compiler (via `ts-morph`) and records every class, method, function and interface, plus the `calls` / `implements` / `extends` / NestJS constructor-`injects` edges between them
@@ -27,6 +27,7 @@ Two of the three never touch an LLM, so their answers are reproducible rather th
 - [x] **`ask`** — `POST /repositories/:id/ask` — hybrid retrieval (vector similarity + exact symbol match + one hop of call-graph expansion) feeds an LLM, which answers using only the retrieved excerpts and cites which one backs each claim.
 - [x] **`map`** — `GET /repositories/:id/map` — Mermaid architecture diagram straight from the symbol graph. No LLM.
 - [x] **Retrieval eval harness** — `npm run eval` scores hybrid retrieval against a vector-only baseline on hand-labelled questions, with real, unretouched numbers — see [Eval](#eval) below.
+- [x] **Web dashboard** — paste a URL, click through `impact` / `map` / `ask` with no `curl` or Swagger required — see [Dashboard](#dashboard) below.
 
 See [Roadmap](#roadmap) for what's deliberately not here yet.
 
@@ -42,15 +43,63 @@ The service foundation — auth, database, Redis, the pluggable embeddings pipel
 - **ts-morph** — the TypeScript compiler API, for symbol resolution
 - **@xenova/transformers** — local ONNX embeddings, no API key required
 - **Ollama** — local LLM for `ask`, no API key required; OpenAI is a configurable option
+- **React + Vite + TypeScript** — the dashboard (`client/`), served from the same origin as the API in production
 
-## Running it
+## Dashboard
 
 ```bash
 cp .env.example .env
 docker compose up
 ```
 
-Swagger UI is at `http://localhost:3000/docs`.
+Open `http://localhost:3000` — paste a repository URL, click **Add & Index**, then click through **Impact** / **Map** / **Ask** once it's ready. One container, one port: the dashboard is a static build served by the same NestJS app that serves the API (`ServeStaticModule`, same-origin — no CORS setup needed in production), so `docker compose up` is the entire quickstart.
+
+Every button maps directly onto an endpoint documented below — the dashboard adds no new backend surface, it's a thin client over the same API `curl` and Swagger already use. A few things worth knowing:
+
+- **Add & Index** is one click that does two requests (register, then trigger indexing) — the row's status badge polls live while it's `pending` / `cloning` / `indexing`, and a failed clone shows the backend's real error message, not a generic failure.
+- **Impact**'s ambiguous-name case (see below) renders every candidate as a button — click one to retry with its exact `symbolId` instead of guessing.
+- **Map** renders the real Mermaid text `GET .../map` returns, client-side. The zoomed `?module=` view below is exactly what clicking "Zoom in" with `search` typed in produces, indexing this same `nestjs-ai-starter` repo:
+
+```mermaid
+flowchart LR
+  subgraph g0["embeddings"]
+    n6["EmbeddingCacheService.embed"]
+    n12[["EmbeddingCacheService"]]
+  end
+  subgraph g1["search"]
+    n0("toVectorLiteral")
+    n1["SearchService.ingest"]
+    n2["SearchController.search"]
+    n3[["SearchModule"]]
+    n4{{"Document"}}
+    n5[["SearchService"]]
+    n7[["IngestDocumentDto"]]
+    n8{{"SearchResult"}}
+    n9[["SearchResultDto"]]
+    n10[["SearchQueryDto"]]
+    n11[["DocumentResponseDto"]]
+    n13["SearchService.search"]
+    n14["SearchController.ingest"]
+    n15[["SearchController"]]
+  end
+  n1 --> n0
+  n1 --> n6
+  n2 --> n13
+  n5 -.->|"injects"| n12
+  n9 -.->|"extends"| n11
+  n13 --> n0
+  n13 --> n6
+  n14 --> n1
+  n15 -.->|"injects"| n5
+```
+
+- **Ask**'s citations are clickable — each one links straight to the exact lines on GitHub (parsed from the repository's own registered URL + the commit it was indexed at), not just a filename.
+
+Dashboard source is in [`client/`](client), a separate Vite + React app — see its own build in the Dockerfile's `client-builder` stage.
+
+## API
+
+Swagger UI is at `http://localhost:3000/docs`. Everything below also works directly via `curl` — the dashboard is a client of this API, not a replacement for it.
 
 To register a repository for analysis:
 
@@ -206,9 +255,8 @@ npm test
 
 ## Roadmap
 
-Deliberately out of v0.1.0, not overlooked:
+Deliberately out of scope so far, not overlooked:
 
-- **Web dashboard** — paste a GitHub URL, index it, click through `impact` / `map` / `ask` without touching `curl` or Swagger. The API already has everything a thin client needs; this is next.
 - **Score-aware retrieval merge** — replace the fixed symbol-exact > graph > vector priority order with one that only lets graph expansion outrank a vector hit below some distance threshold, addressing the trade-off measured in [Eval](#eval).
 - **Multi-language** — v1 is TypeScript-only by design (`ts-morph` gives free cross-file symbol resolution that a tree-sitter-based multi-language approach would have to hand-build).
 - **Incremental reindex** — every `index()` call currently re-parses the whole repo.
