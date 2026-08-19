@@ -106,6 +106,15 @@ export class EnvironmentVariables {
   @IsInt()
   @IsOptional()
   LLM_CACHE_TTL_SECONDS: number = 2592000;
+
+  // The dashboard's Vite dev server runs on a different origin than the
+  // API, so it needs an explicit CORS allow rather than the browser's
+  // default same-origin policy blocking it silently. A real origin
+  // allowlist, not a wildcard — configurable so a deployed dashboard's
+  // origin can be set without a code change.
+  @IsString()
+  @IsOptional()
+  CORS_ORIGIN: string = 'http://localhost:5173';
 }
 
 /**
@@ -150,6 +159,7 @@ export interface AppConfig {
     cacheTtlSeconds: number;
   };
   workspaceDir: string;
+  corsOrigin: string;
   llm: {
     provider: string;
     ollamaBaseUrl: string;
@@ -189,6 +199,7 @@ export function configuration(): AppConfig {
       cacheTtlSeconds: parseInt(process.env.EMBEDDING_CACHE_TTL_SECONDS ?? '2592000', 10),
     },
     workspaceDir: process.env.WORKSPACE_DIR ?? './.workspace',
+    corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
     llm: {
       provider: process.env.LLM_PROVIDER ?? 'ollama',
       // Same Ollama server, same OpenAI key as embeddings — deliberately
