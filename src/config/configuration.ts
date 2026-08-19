@@ -79,6 +79,33 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   WORKSPACE_DIR: string = './.workspace';
+
+  // @xenova/transformers defaults its model cache to a directory INSIDE
+  // node_modules/@xenova/transformers itself — root-owned in the Docker
+  // image, so the non-root runtime user gets EACCES on first use and
+  // silently re-downloads the ~90MB model on every restart instead of
+  // caching it. Redirecting to an app-owned directory fixes that.
+  @IsString()
+  @IsOptional()
+  ONNX_CACHE_DIR: string = './.cache';
+
+  // Ollama by default, not OpenAI — same reasoning as embeddings: v0.1.0
+  // shouldn't require a paid API key to run `ask` end to end.
+  @IsIn(['ollama', 'openai', 'stub'])
+  @IsOptional()
+  LLM_PROVIDER: string = 'ollama';
+
+  @IsString()
+  @IsOptional()
+  OLLAMA_LLM_MODEL: string = 'llama3.2';
+
+  @IsString()
+  @IsOptional()
+  OPENAI_LLM_MODEL: string = 'gpt-4o-mini';
+
+  @IsInt()
+  @IsOptional()
+  LLM_CACHE_TTL_SECONDS: number = 2592000;
 }
 
 /**
@@ -114,6 +141,7 @@ export interface AppConfig {
   embeddings: {
     provider: string;
     onnxModel: string;
+    onnxCacheDir: string;
     openaiApiKey: string;
     openaiModel: string;
     ollamaBaseUrl: string;
@@ -122,6 +150,14 @@ export interface AppConfig {
     cacheTtlSeconds: number;
   };
   workspaceDir: string;
+  llm: {
+    provider: string;
+    ollamaBaseUrl: string;
+    ollamaModel: string;
+    openaiApiKey: string;
+    openaiModel: string;
+    cacheTtlSeconds: number;
+  };
 }
 
 export function configuration(): AppConfig {
@@ -144,6 +180,7 @@ export function configuration(): AppConfig {
     embeddings: {
       provider: process.env.EMBEDDINGS_PROVIDER ?? 'onnx',
       onnxModel: process.env.ONNX_EMBEDDING_MODEL ?? 'Xenova/all-MiniLM-L6-v2',
+      onnxCacheDir: process.env.ONNX_CACHE_DIR ?? './.cache',
       openaiApiKey: process.env.OPENAI_API_KEY ?? '',
       openaiModel: process.env.OPENAI_EMBEDDING_MODEL ?? 'text-embedding-3-small',
       ollamaBaseUrl: process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434',
@@ -152,5 +189,17 @@ export function configuration(): AppConfig {
       cacheTtlSeconds: parseInt(process.env.EMBEDDING_CACHE_TTL_SECONDS ?? '2592000', 10),
     },
     workspaceDir: process.env.WORKSPACE_DIR ?? './.workspace',
+    llm: {
+      provider: process.env.LLM_PROVIDER ?? 'ollama',
+      // Same Ollama server, same OpenAI key as embeddings — deliberately
+      // read directly from the same env vars rather than reaching into
+      // `embeddings.*` from the llm module, so each config section stays
+      // self-contained and independently readable.
+      ollamaBaseUrl: process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434',
+      ollamaModel: process.env.OLLAMA_LLM_MODEL ?? 'llama3.2',
+      openaiApiKey: process.env.OPENAI_API_KEY ?? '',
+      openaiModel: process.env.OPENAI_LLM_MODEL ?? 'gpt-4o-mini',
+      cacheTtlSeconds: parseInt(process.env.LLM_CACHE_TTL_SECONDS ?? '2592000', 10),
+    },
   };
 }
