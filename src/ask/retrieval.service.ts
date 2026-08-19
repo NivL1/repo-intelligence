@@ -54,8 +54,7 @@ interface ChunkRow {
  * "how does semantic search work?" is exactly the kind of result that
  * should pull in what it calls, even though nothing else in the answer
  * shares the query's words. Narrowing this to symbol-matches-only would
- * quietly break that case. (Confirmed working end-to-end against a real
- * repo + real LLM — see CLAUDE.md's Day 5 notes.)
+ * quietly break that case.
  *
  * Merge priority when the combined count exceeds `limit`: exact symbol
  * matches first, then their one-hop callees, then vector hits by

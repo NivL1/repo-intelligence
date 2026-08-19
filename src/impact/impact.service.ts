@@ -13,8 +13,8 @@ import { ImpactCallerDto, ImpactResultDto, SymbolSummaryDto } from './dto/impact
 
 /**
  * Blast-radius analysis: who calls this, transitively, and what tests might
- * cover them. Pure graph traversal on data Day 2 already extracted — no LLM
- * anywhere in this path, so the answer is reproducible, not probabilistic.
+ * cover them. Pure graph traversal — no LLM anywhere in this path, so the
+ * answer is reproducible, not probabilistic.
  */
 @Injectable()
 export class ImpactService {
