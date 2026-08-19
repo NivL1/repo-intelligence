@@ -4,7 +4,7 @@ Codebase intelligence for TypeScript repositories. It builds two indexes of a re
 
 The point of the split: the compiler answers structural questions exactly (*what calls this?*), and embeddings answer conceptual ones (*how does auth work?*). Neither does the other job well.
 
-## Planned commands
+## Commands
 
 | Command | Question | LLM involved |
 | ------- | -------- | ------------ |
@@ -16,7 +16,7 @@ Two of the three never touch an LLM, so their answers are reproducible rather th
 
 ## Status
 
-Early — v0.1.0 is in progress. What actually works today:
+**v0.1.0.** What works:
 
 - [x] **Repository registration** — clone an https:// git URL or reference a local checkout, tracked through a `pending → indexing → ready` lifecycle
 - [x] **Symbol graph extraction** — `POST /repositories/:id/index` parses a TypeScript project with the compiler (via `ts-morph`) and records every class, method, function and interface, plus the `calls` / `implements` / `extends` / NestJS constructor-`injects` edges between them
@@ -25,10 +25,10 @@ Early — v0.1.0 is in progress. What actually works today:
 - [x] **`impact`** — `GET /repositories/:id/impact?symbol=X` reverse-walks the call graph for direct and transitive callers, the modules they live in, and spec files that may cover them (by filename convention — see below). No LLM.
 - [x] **AST-aware chunking and embedding** — `POST /repositories/:id/index` also chunks every method/function/interface (one chunk per symbol, full source + a context header, not an arbitrary character slice) and embeds it via the pluggable embeddings pipeline. Classes aren't chunked as their own unit — see [docs](#chunking) below.
 - [x] **`ask`** — `POST /repositories/:id/ask` — hybrid retrieval (vector similarity + exact symbol match + one hop of call-graph expansion) feeds an LLM, which answers using only the retrieved excerpts and cites which one backs each claim.
-- [ ] `map` — Mermaid architecture diagrams (Day 6)
-- [ ] Retrieval eval harness (Day 6)
+- [x] **`map`** — `GET /repositories/:id/map` — Mermaid architecture diagram straight from the symbol graph. No LLM.
+- [x] **Retrieval eval harness** — `npm run eval` scores hybrid retrieval against a vector-only baseline on hand-labelled questions, with real, unretouched numbers — see [Eval](#eval) below.
 
-Nothing above the line is aspirational; nothing below it is implemented yet.
+See [Roadmap](#roadmap) for what's deliberately not here yet.
 
 ## Built on
 
@@ -134,6 +134,56 @@ Asking something with no answer in the code (*"what is the capital of France?"*)
 
 **Model quality is genuinely model-dependent, worth knowing before you judge the tool by it**: the default `llama3.2` (2GB, fast to pull) sometimes hedges — claiming a repo excerpt doesn't contain an answer that's plainly right there in it — even though retrieval handed it the exact right code every time in testing. Swapping to the larger `llama3` (4.7GB, same free Ollama setup, one config line: `OLLAMA_LLM_MODEL=llama3`) produced the well-structured, correctly-cited answer above from the *identical* retrieved context. Retrieval correctness and answer quality are separate concerns here — the first is what this project builds, the second is a knob you turn.
 
+## Map
+
+```bash
+curl "http://localhost:3000/repositories/$REPO_ID/map" -H "Authorization: Bearer $TOKEN"
+```
+
+Real, deterministic output against `nestjs-ai-starter` — module-level coupling, no LLM, byte-identical every run against the same indexed commit:
+
+```mermaid
+flowchart LR
+  auth["auth"]
+  config["config"]
+  database["database"]
+  embeddings["embeddings"]
+  health["health"]
+  redis["redis"]
+  search["search"]
+  users["users"]
+  auth -->|"7"| users
+  search -->|"3"| embeddings
+```
+
+That `search -->|"3"| embeddings` edge is the same coupling `ask`'s hybrid retrieval was built around: `SearchService` doesn't share any vocabulary with the embeddings layer, but it calls into it three times, and the graph is what makes that visible without reading the code.
+
+Add `?module=search` to zoom into one module's actual symbols — methods, classes, interfaces — plus anything outside it they're directly connected to, grouped by which module it belongs to. Also plain graph traversal, also deterministic.
+
+## Eval
+
+```bash
+docker compose up -d
+npm run eval
+```
+
+Scores hand-labelled questions against an indexed repository twice — once through full hybrid retrieval, once through vector similarity alone — and reports recall@5 and MRR for both, so the project's central claim (a symbol graph improves retrieval over embeddings alone) has a number behind it rather than an assertion.
+
+Real run against `nestjs-ai-starter`, 20 questions, unedited:
+
+```
+mean over 20 questions                      recall  MRR        recall  MRR
+                                             hybrid             vector-only
+                                             0.80    0.49       0.85    0.71
+```
+
+**Reported as measured, not tuned to look better.** Hybrid trails vector-only in aggregate on this set, for two identifiable reasons, not noise:
+
+1. Graph expansion always outranks plain vector hits when the two compete for a truncated slot. That's a clear win when vector search misses a real connection entirely — *"How does semantic search work?"* scores 1.00 recall via the graph vs. 0.50 vector-only, and *"How are JWT tokens issued?"* goes from 0.00 to 1.00. It's a loss when vector was already correct and a real-but-tangential callee crowds the right answer out — *"Which HTTP endpoints does the auth API expose?"* drops from a clean 1.00 to 0.00 because the four expected `AuthController.*` methods get pushed out of the top 5 by `AuthService.*`, which they call but which isn't what was asked.
+2. Exact-match keys on a symbol's bare name as well as its qualified name — deliberately, so a question that just says `search()` still hits. The cost: an ordinary English word that happens to double as a method name (`"search"` is both) forces exact-match priority even when the question is using the word normally, not naming the symbol — *"What fields does a search result contain?"* forces `SearchService.search` to the top and pushes out `Document`, the actual answer.
+
+Both are real, current trade-offs in how results are merged — not bugs, and deliberately not hand-tuned against this one 20-question set, since that would optimize the benchmark rather than retrieval quality. A score-aware merge (letting graph only outrank vector below some distance threshold) is real follow-up work; see [Roadmap](#roadmap).
+
 ## Chunking
 
 Indexing also chunks every method, function and interface — one chunk per symbol, its full source plus a `// file — QualifiedName` header, embedded via the same pluggable pipeline as `nestjs-ai-starter`. Classes aren't chunked as their own unit: a class's text already contains every one of its methods, which are separately chunked, so a whole-class chunk would duplicate that content and risk silent truncation by the embedding model's token limit.
@@ -153,6 +203,16 @@ LocalEmbeddingsProvider.embed    distance 0.55
 ```bash
 npm test
 ```
+
+## Roadmap
+
+Deliberately out of v0.1.0, not overlooked:
+
+- **Web dashboard** — paste a GitHub URL, index it, click through `impact` / `map` / `ask` without touching `curl` or Swagger. The API already has everything a thin client needs; this is next.
+- **Score-aware retrieval merge** — replace the fixed symbol-exact > graph > vector priority order with one that only lets graph expansion outrank a vector hit below some distance threshold, addressing the trade-off measured in [Eval](#eval).
+- **Multi-language** — v1 is TypeScript-only by design (`ts-morph` gives free cross-file symbol resolution that a tree-sitter-based multi-language approach would have to hand-build).
+- **Incremental reindex** — every `index()` call currently re-parses the whole repo.
+- **Multi-repo queries** — `impact`/`map`/`ask` are scoped to one repository; no cross-repo graph yet.
 
 ## License
 

@@ -1,6 +1,6 @@
 {
   "name": "repo-intelligence",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Codebase intelligence for TypeScript repos: a compiler-built symbol graph plus AST-aware RAG. Deterministic impact analysis, architecture diagrams, and cited Q&A.",
   "author": "Niv Lusky <nivmail4@gmail.com>",
   "license": "MIT",
