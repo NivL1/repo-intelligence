@@ -1,6 +1,13 @@
 import type { TokenResponse } from './types';
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+// '' (relative paths, same origin as whatever served this page) is the
+// right default for the production build the Dockerfile produces — the
+// API is served from that same origin (see ServeStaticModule in
+// app.module.ts), so hardcoding a host here would break the moment
+// someone maps a different port or deploys elsewhere. Local dev sets
+// VITE_API_URL explicitly (see .env.example) because the Vite dev server
+// and the API run on different origins there.
+const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
 const ACCESS_TOKEN_KEY = 'ri.accessToken';
 const REFRESH_TOKEN_KEY = 'ri.refreshToken';

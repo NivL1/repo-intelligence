@@ -1,6 +1,6 @@
 {
   "name": "repo-intelligence",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Codebase intelligence for TypeScript repos: a compiler-built symbol graph plus AST-aware RAG. Deterministic impact analysis, architecture diagrams, and cited Q&A.",
   "author": "Niv Lusky <nivmail4@gmail.com>",
   "license": "MIT",
@@ -34,6 +34,7 @@
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/passport": "^10.0.3",
     "@nestjs/platform-express": "^10.4.0",
+    "@nestjs/serve-static": "^4.0.2",
     "@nestjs/swagger": "^7.4.0",
     "@nestjs/terminus": "^10.2.0",
     "@nestjs/typeorm": "^10.0.2",
@@ -86,7 +87,10 @@
     ],
     "rootDir": ".",
     "testRegex": ".*\\.spec\\.ts$",
-    "testPathIgnorePatterns": ["/node_modules/", "<rootDir>/test/fixtures/"],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "<rootDir>/test/fixtures/"
+    ],
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },

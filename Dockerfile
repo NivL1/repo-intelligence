@@ -17,6 +17,17 @@ COPY --chown=node:node . .
 RUN npm run build
 USER node
 
+# Builds the dashboard separately from the API: different toolchain
+# (Vite/React, no native deps at all), and its only output the runtime
+# stage needs is the static dist/ folder — there's no reason to drag a
+# second copy of client/node_modules into the final image.
+FROM node:20-slim AS client-builder
+WORKDIR /app/client
+COPY --chown=node:node client/package.json client/package-lock.json ./
+RUN npm ci
+COPY --chown=node:node client/ .
+RUN npm run build
+
 FROM node:20-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
@@ -33,6 +44,11 @@ RUN apt-get update \
 COPY --chown=node:node package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY --from=builder --chown=node:node /app/dist ./dist
+# Served by ServeStaticModule (see app.module.ts) at the same origin and
+# port as the API — no separate dashboard container or CORS setup needed
+# in production, unlike local dev where the Vite dev server runs on its
+# own port.
+COPY --from=client-builder --chown=node:node /app/client/dist ./client-dist
 # WORKSPACE_DIR and ONNX_CACHE_DIR are created here with node:node
 # ownership: WORKDIR itself is created by root, so without this the
 # non-root `node` user below gets EACCES — on .workspace the first time it
