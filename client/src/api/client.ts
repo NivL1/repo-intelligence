@@ -7,10 +7,14 @@ const REFRESH_TOKEN_KEY = 'ri.refreshToken';
 
 export class ApiError extends Error {
   status: number;
+  /** Full parsed response body — the 409 ambiguous-symbol candidates list
+   *  lives here, since ApiError itself only special-cases `message`. */
+  body: unknown;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, body: unknown = null) {
     super(message);
     this.status = status;
+    this.body = body;
   }
 }
 
@@ -93,6 +97,7 @@ export async function apiFetch<T>(
     throw new ApiError(
       response.status,
       Array.isArray(message) ? message.join(', ') : (message ?? response.statusText),
+      body,
     );
   }
 
