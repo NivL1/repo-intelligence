@@ -437,3 +437,12 @@ textarea:focus {
 .source-list a {
   color: var(--accent);
 }
+
+.demo-badge {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: #eef1ff;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+}

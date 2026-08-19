@@ -115,6 +115,18 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   CORS_ORIGIN: string = 'http://localhost:5173';
+
+  // Off by default — this is a one-way switch for running a public,
+  // read-only demo (see DemoWriteGuard and @PublicInDemoMode), not
+  // something a normal deployment should ever need to touch. Registration
+  // and every mutating repository action are blocked outright when this
+  // is on, regardless of who's asking; browsing the one repo already
+  // seeded doesn't require logging in at all. Never loosens anything in
+  // the default (false) case — this is additive, not a mode swap.
+  @IsBoolean()
+  @IsOptional()
+  @Transform(({ obj }) => obj.DEMO_MODE === 'true')
+  DEMO_MODE: boolean = false;
 }
 
 /**
@@ -160,6 +172,7 @@ export interface AppConfig {
   };
   workspaceDir: string;
   corsOrigin: string;
+  demoMode: boolean;
   llm: {
     provider: string;
     ollamaBaseUrl: string;
@@ -200,6 +213,7 @@ export function configuration(): AppConfig {
     },
     workspaceDir: process.env.WORKSPACE_DIR ?? './.workspace',
     corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+    demoMode: process.env.DEMO_MODE === 'true',
     llm: {
       provider: process.env.LLM_PROVIDER ?? 'ollama',
       // Same Ollama server, same OpenAI key as embeddings — deliberately

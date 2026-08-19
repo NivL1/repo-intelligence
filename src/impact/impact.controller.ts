@@ -1,5 +1,6 @@
 import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { PublicInDemoMode } from '../auth/decorators/public-in-demo-mode.decorator';
 import { ImpactQueryDto } from './dto/impact-query.dto';
 import { ImpactResultDto } from './dto/impact-result.dto';
 import { ImpactService } from './impact.service';
@@ -11,6 +12,7 @@ export class ImpactController {
   constructor(private readonly impact: ImpactService) {}
 
   @Get(':id/impact')
+  @PublicInDemoMode()
   @ApiOperation({
     summary: 'What breaks if this symbol changes',
     description:
