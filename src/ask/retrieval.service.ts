@@ -57,9 +57,11 @@ interface ChunkRow {
  * quietly break that case.
  *
  * Merge priority when the combined count exceeds `limit`: exact symbol
- * matches first, then their one-hop callees, then vector hits by
- * ascending distance. A truncation that dropped the exact-name match in
- * favour of a weak vector hit would defeat the point of having it.
+ * matches first — including one found by vector search too, re-tagged
+ * rather than left to compete on distance — then their one-hop callees,
+ * then plain vector hits by ascending distance. A truncation that dropped
+ * the exact-name match in favour of a weak vector hit would defeat the
+ * point of having it.
  */
 @Injectable()
 export class RetrievalService {
@@ -134,16 +136,28 @@ export class RetrievalService {
         )
       : [];
 
+    // A vector hit whose symbol is ALSO an exact name match must not be
+    // judged by distance alongside plain vector noise — it earned its
+    // priority the same way a freshly-fetched exact match did, and
+    // `alreadyCovered` only kept it out of extraChunks to avoid fetching
+    // its chunk twice, not to demote it. Splitting vectorRows here is what
+    // makes that distinction survive into the merge below; without it, an
+    // exact-name query for a symbol vector search also happens to surface
+    // can get that very symbol truncated away by lower-value graph hits.
+    const vectorExact = vectorRows.filter((r) => r.symbolId && symbolMatchIds.has(r.symbolId));
+    const vectorOnly = vectorRows.filter((r) => !r.symbolId || !symbolMatchIds.has(r.symbolId));
+
     // Symbol-exact hits before graph-expansion hits before vector hits —
     // see the class doc comment on why this order matters for truncation.
     const prioritized: RetrievedChunk[] = [
       ...extraChunks
         .filter((c) => symbolMatchIds.has(c.symbolId))
         .map((c) => toRetrievedChunk(c, 'symbol')),
+      ...vectorExact.map((r) => ({ ...toVectorChunk(r), source: 'symbol' as const })),
       ...extraChunks
         .filter((c) => !symbolMatchIds.has(c.symbolId))
         .map((c) => toRetrievedChunk(c, 'graph')),
-      ...vectorRows.map(toVectorChunk),
+      ...vectorOnly.map(toVectorChunk),
     ];
 
     const seen = new Set<string>();
