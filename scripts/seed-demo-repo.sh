@@ -21,16 +21,29 @@ DEMO_EMAIL="${DEMO_EMAIL:?set DEMO_EMAIL}"
 DEMO_PASSWORD="${DEMO_PASSWORD:?set DEMO_PASSWORD (min 8 chars)}"
 REPO_SOURCE="${REPO_SOURCE:?set REPO_SOURCE, e.g. https://github.com/owner/repo}"
 
+# A password is allowed to contain quotes, backslashes, anything —
+# building the JSON body with shell string interpolation (the previous
+# version of this script) would send malformed JSON for such a password,
+# or worse, misinterpret it. Values are passed as argv, not read back out
+# of the environment — argv needs no `export` and has no ambiguity about
+# which shell variable a name refers to.
+json_body() {
+  python3 -c '
+import json, sys
+print(json.dumps(dict(zip(sys.argv[1::2], sys.argv[2::2]))))
+' "$@"
+}
+
 echo "Registering (or logging in, if this has already run once)..."
 TOKEN=$(
   curl -sf -X POST "$BASE_URL/auth/register" \
     -H 'Content-Type: application/json' \
-    -d "{\"email\":\"$DEMO_EMAIL\",\"password\":\"$DEMO_PASSWORD\"}" \
+    -d "$(json_body email "$DEMO_EMAIL" password "$DEMO_PASSWORD")" \
     2>/dev/null \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["accessToken"])' \
   || curl -sf -X POST "$BASE_URL/auth/login" \
     -H 'Content-Type: application/json' \
-    -d "{\"email\":\"$DEMO_EMAIL\",\"password\":\"$DEMO_PASSWORD\"}" \
+    -d "$(json_body email "$DEMO_EMAIL" password "$DEMO_PASSWORD")" \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["accessToken"])'
 )
 
@@ -39,7 +52,7 @@ REPO_ID=$(
   curl -sf -X POST "$BASE_URL/repositories" \
     -H "Authorization: Bearer $TOKEN" \
     -H 'Content-Type: application/json' \
-    -d "{\"source\":\"$REPO_SOURCE\"}" \
+    -d "$(json_body source "$REPO_SOURCE")" \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])'
 )
 echo "Repository id: $REPO_ID"
