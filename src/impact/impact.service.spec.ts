@@ -212,4 +212,28 @@ describe('ImpactService', () => {
       expect(result.relatedTests).toEqual([]);
     });
   });
+
+  describe('listSymbols', () => {
+    it('returns every symbol for the repository, sorted by qualified name', async () => {
+      symbols.find.mockResolvedValue([
+        symbol({ id: 'a', qualifiedName: 'A.one' }),
+        symbol({ id: 'b', qualifiedName: 'B.two' }),
+      ]);
+
+      const result = await service.listSymbols('repo-id');
+
+      expect(symbols.find).toHaveBeenCalledWith({
+        where: { repositoryId: 'repo-id' },
+        order: { qualifiedName: 'ASC' },
+      });
+      expect(result.map((s) => s.qualifiedName)).toEqual(['A.one', 'B.two']);
+    });
+
+    it('propagates NotFoundException for an unknown repository, without querying symbols', async () => {
+      repositoriesService.findOne.mockRejectedValue(new NotFoundException('nope'));
+
+      await expect(service.listSymbols('missing-repo')).rejects.toThrow(NotFoundException);
+      expect(symbols.find).not.toHaveBeenCalled();
+    });
+  });
 });

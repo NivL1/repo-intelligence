@@ -1,8 +1,11 @@
 import { join } from 'path';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { ServeStaticModule } from '@nestjs/serve-static';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { configuration, validateEnv } from './config/configuration';
+import { PublicConfigController } from './config/public-config.controller';
 import { DatabaseModule } from './database/database.module';
 import { RedisModule } from './redis/redis.module';
 import { UsersModule } from './users/users.module';
@@ -23,6 +26,11 @@ import { AskModule } from './ask/ask.module';
       load: [configuration],
       validate: validateEnv,
     }),
+    // A general safety net across the whole API, not specific to demo
+    // mode — 60 req/min per IP. `ask` gets a much stricter override
+    // (see AskController) since each call costs real LLM money and, in
+    // demo mode, doesn't even require an account to reach.
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 60 }]),
     DatabaseModule,
     RedisModule,
     UsersModule,
@@ -57,8 +65,11 @@ import { AskModule } from './ask/ask.module';
         '/docs/(.*)',
         '/docs-json/(.*)',
         '/docs-yaml/(.*)',
+        '/config/(.*)',
       ],
     }),
   ],
+  controllers: [PublicConfigController],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

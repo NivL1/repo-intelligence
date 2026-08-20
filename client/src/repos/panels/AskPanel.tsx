@@ -26,6 +26,14 @@ export function AskPanel({ repo }: { repo: Repository }) {
 
   return (
     <div className="panel">
+      <p className="panel-description">
+        Ask a question in plain English. Hybrid retrieval — vector similarity, exact
+        symbol-name matches, and one hop of the call graph — finds the most relevant code,
+        then an LLM answers using only those excerpts, citing exactly which one backs each
+        claim. If the code doesn't actually answer the question, it says so instead of
+        guessing.
+      </p>
+
       <form className="ask-form" onSubmit={handleSubmit}>
         <textarea
           rows={3}

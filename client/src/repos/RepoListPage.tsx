@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { addAndIndexRepository, deleteRepository } from '../api/repositories';
 import { useAuth } from '../auth/AuthContext';
+import { useDemoMode } from '../config/DemoModeContext';
 import type { Repository, RepositoryStatus } from '../api/types';
 import { useRepositories } from './useRepositories';
 
@@ -16,6 +17,7 @@ const STATUS_LABEL: Record<RepositoryStatus, string> = {
 export function RepoListPage() {
   const { repositories, loading, error, refresh } = useRepositories();
   const { logout } = useAuth();
+  const { demoMode } = useDemoMode();
   const navigate = useNavigate();
   const [source, setSource] = useState('');
   const [adding, setAdding] = useState(false);
@@ -54,32 +56,52 @@ export function RepoListPage() {
     <div className="page">
       <header className="page-header">
         <h1>repo-intelligence</h1>
-        <button type="button" className="link-button" onClick={logout}>
-          Log out
-        </button>
+        {demoMode ? (
+          <span className="demo-badge">Public demo — read-only</span>
+        ) : (
+          <button type="button" className="link-button" onClick={logout}>
+            Log out
+          </button>
+        )}
       </header>
 
-      <form className="add-repo-form" onSubmit={handleAdd}>
-        <input
-          type="url"
-          required
-          placeholder="https://github.com/owner/repo"
-          value={source}
-          onChange={(e) => setSource(e.target.value)}
-          disabled={adding}
-        />
-        <button type="submit" disabled={adding}>
-          {adding ? 'Adding…' : 'Add & Index'}
-        </button>
-      </form>
-      {addError && <p className="error">{addError}</p>}
+      <p className="intro">
+        repo-intelligence analyzes TypeScript repositories two ways: a compiler-built
+        symbol graph for exact, structural questions ("what calls this?"), and AST-aware
+        embeddings for fuzzy, conceptual ones ("how does auth work?").{' '}
+        {demoMode
+          ? 'The repository below has already been indexed this way — open it to explore.'
+          : 'Paste a GitHub URL below and it gets cloned, parsed by the TypeScript ' +
+            'compiler, and embedded automatically before you can explore it.'}
+      </p>
+
+      {!demoMode && (
+        <>
+          <form className="add-repo-form" onSubmit={handleAdd}>
+            <input
+              type="url"
+              required
+              placeholder="https://github.com/owner/repo"
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+              disabled={adding}
+            />
+            <button type="submit" disabled={adding}>
+              {adding ? 'Adding…' : 'Add & Index'}
+            </button>
+          </form>
+          {addError && <p className="error">{addError}</p>}
+        </>
+      )}
 
       {loading && <p>Loading…</p>}
       {error && <p className="error">{error}</p>}
 
       {!loading && repositories.length === 0 && (
         <p className="empty-state">
-          No repositories yet — paste an https:// GitHub URL above to get started.
+          {demoMode
+            ? 'No repositories indexed yet.'
+            : 'No repositories yet — paste an https:// GitHub URL above to get started.'}
         </p>
       )}
 
@@ -105,9 +127,11 @@ export function RepoListPage() {
               >
                 Open
               </button>
-              <button type="button" className="danger" onClick={() => handleDelete(repo)}>
-                Delete
-              </button>
+              {!demoMode && (
+                <button type="button" className="danger" onClick={() => handleDelete(repo)}>
+                  Delete
+                </button>
+              )}
             </div>
           </li>
         ))}

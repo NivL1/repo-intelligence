@@ -7,6 +7,8 @@ coverage
 .gitignore
 .env
 .env.example
+**/.env
+**/.env.example
 .idea
 *.md
 Dockerfile*
