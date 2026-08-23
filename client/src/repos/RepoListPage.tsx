@@ -4,6 +4,7 @@ import { addAndIndexRepository, deleteRepository } from '../api/repositories';
 import { useAuth } from '../auth/AuthContext';
 import { useDemoMode } from '../config/DemoModeContext';
 import type { Repository, RepositoryStatus } from '../api/types';
+import { DemoLanding } from './DemoLanding';
 import { useRepositories } from './useRepositories';
 
 const STATUS_LABEL: Record<RepositoryStatus, string> = {
@@ -52,10 +53,12 @@ export function RepoListPage() {
     await refresh();
   }
 
+  const firstReady = repositories.find((r) => r.status === 'ready');
+
   return (
-    <div className="page">
+    <div className={demoMode ? 'page page-wide' : 'page'}>
       <header className="page-header">
-        <h1>repo-intelligence</h1>
+        {!demoMode && <h1>repo-intelligence</h1>}
         {demoMode ? (
           <span className="demo-badge">Public demo — read-only</span>
         ) : (
@@ -65,15 +68,17 @@ export function RepoListPage() {
         )}
       </header>
 
-      <p className="intro">
-        repo-intelligence analyzes TypeScript repositories two ways: a compiler-built
-        symbol graph for exact, structural questions ("what calls this?"), and AST-aware
-        embeddings for fuzzy, conceptual ones ("how does auth work?").{' '}
-        {demoMode
-          ? 'The repository below has already been indexed this way — open it to explore.'
-          : 'Paste a GitHub URL below and it gets cloned, parsed by the TypeScript ' +
-            'compiler, and embedded automatically before you can explore it.'}
-      </p>
+      {demoMode && firstReady && <DemoLanding repoId={firstReady.id} />}
+
+      {!demoMode && (
+        <p className="intro">
+          repo-intelligence analyzes TypeScript repositories two ways: a compiler-built
+          symbol graph for exact, structural questions ("what calls this?"), and AST-aware
+          embeddings for fuzzy, conceptual ones ("how does auth work?"). Paste a GitHub URL
+          below and it gets cloned, parsed by the TypeScript compiler, and embedded
+          automatically before you can explore it.
+        </p>
+      )}
 
       {!demoMode && (
         <>

@@ -462,3 +462,133 @@ textarea:focus {
   max-width: 65ch;
   margin: 0 0 0.5rem;
 }
+
+/* Demo landing */
+
+.demo-landing {
+  margin-bottom: 3rem;
+  padding-bottom: 2.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.hero {
+  text-align: center;
+  max-width: 62ch;
+  margin: 0.5rem auto 2.5rem;
+}
+
+.hero h1 {
+  font-size: 2.5rem;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.5rem;
+}
+
+.hero-tagline {
+  color: var(--accent);
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 0 0 1rem;
+}
+
+.hero-description {
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+}
+
+@media (max-width: 720px) {
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.feature-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
+  border-radius: 10px;
+  padding: 1.25rem;
+}
+
+.feature-card h3 {
+  margin: 0.5rem 0 0.4rem;
+  font-size: 1.1rem;
+}
+
+.feature-card p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.feature-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+}
+
+.feature-tag.llm {
+  color: var(--accent);
+  background: #eef1ff;
+  border-color: transparent;
+}
+
+.showcase {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.showcase-label {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  margin: 0 0 1rem;
+}
+
+.ask-showcase-question {
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-style: italic;
+  margin: 0 0 0.75rem;
+}
+
+.ask-showcase-answer {
+  color: var(--text);
+  line-height: 1.6;
+  margin: 0 0 1rem;
+}
+
+.overview-text {
+  color: var(--text);
+  font-size: 1.02rem;
+  line-height: 1.65;
+  margin: 0;
+}
+
+.scroll-hint {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin: 0;
+}
