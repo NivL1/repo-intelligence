@@ -586,6 +586,24 @@ textarea:focus {
   margin: 0;
 }
 
+.repo-overview {
+  color: var(--text);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  max-width: 70ch;
+  margin: 0 0 1.5rem;
+  padding: 0.9rem 1.1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+}
+
+.repo-overview.loading {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 .scroll-hint {
   text-align: center;
   color: var(--text-muted);

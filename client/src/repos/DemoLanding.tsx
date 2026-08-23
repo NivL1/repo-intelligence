@@ -70,18 +70,6 @@ export function DemoLanding({ repoId }: { repoId: string }) {
         </p>
       </div>
 
-      <div className="feature-grid">
-        {FEATURES.map((f) => (
-          <div className="feature-card" key={f.title}>
-            <span className={f.tag === 'No LLM' ? 'feature-tag' : 'feature-tag llm'}>
-              {f.tag}
-            </span>
-            <h3>{f.title}</h3>
-            <p>{f.description}</p>
-          </div>
-        ))}
-      </div>
-
       {(overview || overviewLoading) && (
         <div className="showcase">
           <p className="showcase-label">Live example — what this repository actually is</p>
@@ -99,6 +87,18 @@ export function DemoLanding({ repoId }: { repoId: string }) {
           <MermaidDiagram code={diagram} />
         </div>
       )}
+
+      <div className="feature-grid">
+        {FEATURES.map((f) => (
+          <div className="feature-card" key={f.title}>
+            <span className={f.tag === 'No LLM' ? 'feature-tag' : 'feature-tag llm'}>
+              {f.tag}
+            </span>
+            <h3>{f.title}</h3>
+            <p>{f.description}</p>
+          </div>
+        ))}
+      </div>
 
       <div className="showcase">
         <p className="showcase-label">Real example — an actual answer from this demo</p>
