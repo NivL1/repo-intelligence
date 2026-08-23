@@ -53,7 +53,16 @@ export function RepoListPage() {
     await refresh();
   }
 
-  const firstReady = repositories.find((r) => r.status === 'ready');
+  // The landing showcase's hardcoded `ask` example is specific to
+  // nestjs-ai-starter (a real captured Q&A about ITS search feature) —
+  // pinning by name keeps the showcase repo consistent with that example
+  // regardless of which repo happens to be newest (the list is sorted by
+  // createdAt, so "first ready" alone would flip to whatever was seeded
+  // most recently). Falls back to first-ready so the landing section
+  // still shows something if that specific repo isn't present.
+  const showcaseRepo =
+    repositories.find((r) => r.status === 'ready' && r.name === 'NivL1/nestjs-ai-starter') ??
+    repositories.find((r) => r.status === 'ready');
 
   return (
     <div className={demoMode ? 'page page-wide' : 'page'}>
@@ -68,7 +77,7 @@ export function RepoListPage() {
         )}
       </header>
 
-      {demoMode && firstReady && <DemoLanding repoId={firstReady.id} />}
+      {demoMode && showcaseRepo && <DemoLanding repoId={showcaseRepo.id} />}
 
       {!demoMode && (
         <p className="intro">
