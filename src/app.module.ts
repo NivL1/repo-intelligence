@@ -18,6 +18,7 @@ import { ImpactModule } from './impact/impact.module';
 import { MapModule } from './map/map.module';
 import { LlmModule } from './llm/llm.module';
 import { AskModule } from './ask/ask.module';
+import { OverviewModule } from './overview/overview.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { AskModule } from './ask/ask.module';
     MapModule,
     LlmModule,
     AskModule,
+    OverviewModule,
     // Serves the dashboard's production build from the same origin and
     // port as the API — the Dockerfile builds client/ into a separate
     // stage and copies its output here (see the `client-builder` stage).

@@ -4,6 +4,7 @@ import { addAndIndexRepository, deleteRepository } from '../api/repositories';
 import { useAuth } from '../auth/AuthContext';
 import { useDemoMode } from '../config/DemoModeContext';
 import type { Repository, RepositoryStatus } from '../api/types';
+import { DemoLanding } from './DemoLanding';
 import { useRepositories } from './useRepositories';
 
 const STATUS_LABEL: Record<RepositoryStatus, string> = {
@@ -52,10 +53,21 @@ export function RepoListPage() {
     await refresh();
   }
 
+  // The landing showcase's hardcoded `ask` example is specific to
+  // nestjs-ai-starter (a real captured Q&A about ITS search feature) —
+  // pinning by name keeps the showcase repo consistent with that example
+  // regardless of which repo happens to be newest (the list is sorted by
+  // createdAt, so "first ready" alone would flip to whatever was seeded
+  // most recently). Falls back to first-ready so the landing section
+  // still shows something if that specific repo isn't present.
+  const showcaseRepo =
+    repositories.find((r) => r.status === 'ready' && r.name === 'NivL1/nestjs-ai-starter') ??
+    repositories.find((r) => r.status === 'ready');
+
   return (
-    <div className="page">
+    <div className={demoMode ? 'page page-wide' : 'page'}>
       <header className="page-header">
-        <h1>repo-intelligence</h1>
+        {!demoMode && <h1>repo-intelligence</h1>}
         {demoMode ? (
           <span className="demo-badge">Public demo — read-only</span>
         ) : (
@@ -65,15 +77,17 @@ export function RepoListPage() {
         )}
       </header>
 
-      <p className="intro">
-        repo-intelligence analyzes TypeScript repositories two ways: a compiler-built
-        symbol graph for exact, structural questions ("what calls this?"), and AST-aware
-        embeddings for fuzzy, conceptual ones ("how does auth work?").{' '}
-        {demoMode
-          ? 'The repository below has already been indexed this way — open it to explore.'
-          : 'Paste a GitHub URL below and it gets cloned, parsed by the TypeScript ' +
-            'compiler, and embedded automatically before you can explore it.'}
-      </p>
+      {demoMode && showcaseRepo && <DemoLanding repoId={showcaseRepo.id} />}
+
+      {!demoMode && (
+        <p className="intro">
+          repo-intelligence analyzes TypeScript repositories two ways: a compiler-built
+          symbol graph for exact, structural questions ("what calls this?"), and AST-aware
+          embeddings for fuzzy, conceptual ones ("how does auth work?"). Paste a GitHub URL
+          below and it gets cloned, parsed by the TypeScript compiler, and embedded
+          automatically before you can explore it.
+        </p>
+      )}
 
       {!demoMode && (
         <>
