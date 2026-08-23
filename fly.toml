@@ -31,4 +31,7 @@ primary_region = "iad"
 [[vm]]
   cpu_kind = "shared"
   cpus = 1
-  memory_mb = 512
+  # 512MB OOM-crashed indexing repo-intelligence itself (ts-morph's
+  # full compiler pass over a bigger, more complex codebase than
+  # nestjs-ai-starter needs more headroom than that repo did).
+  memory_mb = 1024
