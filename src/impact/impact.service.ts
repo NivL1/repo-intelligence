@@ -26,6 +26,23 @@ export class ImpactService {
     private readonly workspace: WorkspaceService,
   ) {}
 
+  /**
+   * Backs the Impact panel's symbol picker — a demo visitor has no way to
+   * already know a valid qualified name to type, unlike someone who wrote
+   * the indexed repo themselves. Every symbol, not just ones with known
+   * callers: a symbol with zero callers is still a legitimate (if
+   * unexciting) thing to pick, and filtering it out here would just move
+   * the "why can't I find X" confusion from before the query to after it.
+   */
+  async listSymbols(repositoryId: string): Promise<SymbolSummaryDto[]> {
+    await this.repositoriesService.findOne(repositoryId); // throws NotFoundException if unknown
+    const symbols = await this.symbols.find({
+      where: { repositoryId },
+      order: { qualifiedName: 'ASC' },
+    });
+    return symbols.map(toSummary);
+  }
+
   async getImpact(repositoryId: string, query: ImpactQueryDto): Promise<ImpactResultDto> {
     const repository = await this.repositoriesService.findOne(repositoryId);
     const target = await this.resolveSymbol(repositoryId, query);

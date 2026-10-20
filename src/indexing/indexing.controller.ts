@@ -1,5 +1,14 @@
-import { Controller, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import {
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { DemoWriteGuard } from '../auth/guards/demo-write-guard';
 import { RepositoryResponseDto } from '../repositories/dto/repository-response.dto';
 import { IndexResultDto } from './dto/index-result.dto';
 import { IndexingService } from './indexing.service';
@@ -11,6 +20,7 @@ export class IndexingController {
   constructor(private readonly indexing: IndexingService) {}
 
   @Post(':id/index')
+  @UseGuards(DemoWriteGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Parse a repository and (re)build its symbol graph and chunk index',

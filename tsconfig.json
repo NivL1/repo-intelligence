@@ -20,10 +20,11 @@
     "noFallthroughCasesInSwitch": false,
     "esModuleInterop": true
   },
-  // `client/` is a separate Vite/React project with its own tsconfig,
-  // JSX, module resolution and node_modules — it must never be picked up
-  // by the backend's compiler. tsconfig.build.json's own `exclude`
-  // replaces this one entirely rather than merging with it, so `client`
-  // (and `eval`, `test`) has to be listed there too, not just here.
-  "exclude": ["node_modules", "client"]
+  // `client/` (the Vite/React dashboard) and `mcp/` (the MCP server) are
+  // separate packages, each with its own tsconfig, module resolution and
+  // node_modules — neither must ever be picked up by the backend's
+  // compiler. tsconfig.build.json's own `exclude` replaces this one
+  // entirely rather than merging with it, so both (and `eval`, `test`)
+  // have to be listed there too, not just here.
+  "exclude": ["node_modules", "client", "mcp"]
 }

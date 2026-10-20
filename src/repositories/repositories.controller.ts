@@ -8,8 +8,11 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { DemoWriteGuard } from '../auth/guards/demo-write-guard';
+import { PublicInDemoMode } from '../auth/decorators/public-in-demo-mode.decorator';
 import { CreateRepositoryDto } from './dto/create-repository.dto';
 import { RepositoryResponseDto } from './dto/repository-response.dto';
 import { RepositoriesService } from './repositories.service';
@@ -21,6 +24,7 @@ export class RepositoriesController {
   constructor(private readonly repositories: RepositoriesService) {}
 
   @Post()
+  @UseGuards(DemoWriteGuard)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Register a repository and check out a working copy',
@@ -33,6 +37,7 @@ export class RepositoriesController {
   }
 
   @Get()
+  @PublicInDemoMode()
   @ApiOperation({ summary: 'List registered repositories' })
   async findAll(): Promise<RepositoryResponseDto[]> {
     const repositories = await this.repositories.findAll();
@@ -40,12 +45,14 @@ export class RepositoriesController {
   }
 
   @Get(':id')
+  @PublicInDemoMode()
   @ApiOperation({ summary: 'Get a single repository' })
   async findOne(@Param('id', ParseUUIDPipe) id: string): Promise<RepositoryResponseDto> {
     return RepositoryResponseDto.from(await this.repositories.findOne(id));
   }
 
   @Delete(':id')
+  @UseGuards(DemoWriteGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete a repository',

@@ -193,7 +193,17 @@ export class SymbolExtractor {
   ): ExtractedChunk {
     return {
       symbolKey,
-      content: `// ${filePath} — ${qualifiedName}\n${node.getText(true).trim()}`,
+      // stripNullBytes: `node.getText()` is the raw source text of an
+      // arbitrary indexed repository — unlike a symbol's name (constrained
+      // by the TS grammar to valid identifier characters), a chunk's
+      // content can legitimately contain a literal 0x00 byte inside a
+      // string literal, comment, or regex, which Postgres's UTF-8 column
+      // encoding rejects outright (every other control character is a
+      // valid, if unusual, byte in a Postgres text column — 0x00
+      // specifically is not). Indexing is a system boundary — arbitrary
+      // https:// repos, not just this project's own source — so this
+      // isn't a hypothetical to skip validating.
+      content: stripNullBytes(`// ${filePath} — ${qualifiedName}\n${node.getText(true).trim()}`),
       filePath,
       startLine: node.getStartLineNumber(),
       endLine: node.getEndLineNumber(),
@@ -297,6 +307,13 @@ export class SymbolExtractor {
     const target = symbol.getAliasedSymbol() ?? symbol;
     return target.getDeclarations()[0];
   }
+}
+
+// Postgres text columns reject a raw 0x00 byte outright (unlike other
+// control characters, which are valid if unusual) — see the buildChunk()
+// call site for why this only needs to guard `content`, not every field.
+function stripNullBytes(text: string): string {
+  return text.includes('\0') ? text.replace(/\0/g, '') : text;
 }
 
 function dedupeEdges(edges: ExtractedEdge[]): ExtractedEdge[] {

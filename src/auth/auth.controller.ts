@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { CurrentUser, RequestUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
+import { DemoWriteGuard } from './guards/demo-write-guard';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { TokenResponseDto } from './dto/token-response.dto';
@@ -15,6 +16,7 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Public()
+  @UseGuards(DemoWriteGuard)
   @Post('register')
   register(@Body() dto: RegisterDto): Promise<TokenResponseDto> {
     return this.auth.register(dto.email, dto.password);
