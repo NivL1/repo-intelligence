@@ -16,7 +16,7 @@ Two of the three never touch an LLM, so their answers are reproducible rather th
 
 ## Status
 
-**v0.2.0.** What works:
+**v0.3.0.** What works:
 
 - [x] **Repository registration** — clone an https:// git URL or reference a local checkout, tracked through a `pending → indexing → ready` lifecycle
 - [x] **Symbol graph extraction** — `POST /repositories/:id/index` parses a TypeScript project with the compiler (via `ts-morph`) and records every class, method, function and interface, plus the `calls` / `implements` / `extends` / NestJS constructor-`injects` edges between them
