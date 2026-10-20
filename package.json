@@ -90,7 +90,8 @@
     "testRegex": ".*\\.spec\\.ts$",
     "testPathIgnorePatterns": [
       "/node_modules/",
-      "<rootDir>/test/fixtures/"
+      "<rootDir>/test/fixtures/",
+      "<rootDir>/mcp/"
     ],
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"

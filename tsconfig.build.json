@@ -14,7 +14,7 @@
     // chasing it exclusion by exclusion.
     "rootDir": "./src"
   },
-  // `eval` and `client` (the dashboard, its own separate Vite/React
-  // project) have no place in the production image regardless of rootDir.
-  "exclude": ["node_modules", "test", "eval", "client", "dist", "**/*spec.ts"]
+  // `eval`, `client` (the dashboard) and `mcp` (the MCP server, its own
+  // package) have no place in the production image regardless of rootDir.
+  "exclude": ["node_modules", "test", "eval", "client", "mcp", "dist", "**/*spec.ts"]
 }
