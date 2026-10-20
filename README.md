@@ -28,6 +28,7 @@ Two of the three never touch an LLM, so their answers are reproducible rather th
 - [x] **`map`** — `GET /repositories/:id/map` — Mermaid architecture diagram straight from the symbol graph. No LLM.
 - [x] **Retrieval eval harness** — `npm run eval` scores hybrid retrieval against a vector-only baseline on hand-labelled questions, with real, unretouched numbers — see [Eval](#eval) below.
 - [x] **Web dashboard** — paste a URL, click through `impact` / `map` / `ask` with no `curl` or Swagger required — see [Dashboard](#dashboard) below.
+- [x] **MCP server**: `impact` / `map` / `ask` as tools for Claude Code, Cursor and other MCP clients. See [MCP server](#mcp-server) below.
 
 See [Roadmap](#roadmap) for what's deliberately not here yet.
 
@@ -96,6 +97,42 @@ flowchart LR
 - **Ask**'s citations are clickable — each one links straight to the exact lines on GitHub (parsed from the repository's own registered URL + the commit it was indexed at), not just a filename.
 
 Dashboard source is in [`client/`](client), a separate Vite + React app — see its own build in the Dockerfile's `client-builder` stage.
+
+## MCP server
+
+[`mcp/`](./mcp) is a [Model Context Protocol](https://modelcontextprotocol.io) server that hands `impact`, `map` and `ask` to AI coding assistants (Claude Code, Claude Desktop, Cursor, ...) as tools, so an agent can check a change's blast radius *before* it edits a function, instead of grepping and guessing.
+
+```bash
+cd mcp && npm install && npm run build
+claude mcp add repo-intelligence -- node "$(pwd)/dist/index.js"
+```
+
+It points at the public demo out of the box, so that's the whole setup. Then ask the assistant something like *"in nestjs-ai-starter, what breaks if I change EmbeddingCacheService.embed?"*.
+
+| Tool | Backed by | LLM |
+| ---- | --------- | --- |
+| `list_repositories` | `GET /repositories` | No |
+| `find_symbols` | `GET /repositories/:id/symbols`, filtered by name/path/kind | No |
+| `impact` | `GET /repositories/:id/impact` | No |
+| `map` | `GET /repositories/:id/map` | No |
+| `get_overview` | `GET /repositories/:id/overview` | Yes (cached) |
+| `ask` | `POST /repositories/:id/ask` | Yes |
+
+Each tool's description tells the assistant which side of the deterministic/LLM line it's on, the same distinction this README draws, so the model knows `impact` is exact and `ask` is a sourced starting point.
+
+It's a thin adapter over the HTTP API, not a second way into the services. Every guard the API already enforces (JWT auth, demo-mode read-only access, the per-IP throttle on `ask`) applies to MCP callers with no duplicated logic, and the adapter needs no Postgres, Redis or ONNX to run. The tools are read-only: registering and indexing a repository stay on the API and dashboard.
+
+Some agent-friendly details:
+
+- Repositories resolve by id, full name, or bare name (`nestjs-ai-starter`).
+- A bare method name passed to `impact` (`embed`) gets the qualified names it could mean, not just a 404.
+- An ambiguous name returns every candidate's id to retry with.
+- 401 and 429 come back as tool errors that say what to do about them.
+
+| Env var | Default | Purpose |
+| ------- | ------- | ------- |
+| `REPO_INTELLIGENCE_URL` | `https://repo-intelligence-demo.fly.dev` | Which deployment to query |
+| `REPO_INTELLIGENCE_TOKEN` | (none) | JWT access token, for a deployment not in demo mode |
 
 ## API
 
@@ -251,6 +288,7 @@ LocalEmbeddingsProvider.embed    distance 0.55
 
 ```bash
 npm test
+cd mcp && npm test   # the MCP server is its own package
 ```
 
 ## Roadmap
